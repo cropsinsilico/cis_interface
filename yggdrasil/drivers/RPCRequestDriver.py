@@ -1,5 +1,4 @@
 from yggdrasil.drivers.ConnectionDriver import ConnectionDriver, run_remotely
-from yggdrasil.drivers.RPCResponseDriver import RPCResponseDriver
 from yggdrasil.communication import CommBase
 
 # ----
@@ -37,14 +36,11 @@ class RPCRequestDriver(ConnectionDriver):
             model to send requests.
         **kwargs: Additional keyword arguments are passed to parent class.
 
-    Attributes:
-        response_drivers (list): Response drivers created for each request.
-
     """
 
     _connection_type = 'rpc_request'
 
-    def __init__(self, model_request_name, response_kwargs=None, **kwargs):
+    def __init__(self, model_request_name, **kwargs):
         # Input communicator
         inputs = kwargs.get('inputs', [{}])
         # inputs[0]['name'] = model_request_name + '.client_model_request'
@@ -55,14 +51,8 @@ class RPCRequestDriver(ConnectionDriver):
         outputs[0]['is_client'] = True
         outputs[0]['close_on_eof_send'] = False
         kwargs['outputs'] = outputs
-        if response_kwargs is None:
-            response_kwargs = {}
-        self.response_kwargs = response_kwargs
         # Parent and attributes
         super(RPCRequestDriver, self).__init__(model_request_name, **kwargs)
-        self.response_kwargs.setdefault('commtype', self.ocomm._commtype)
-        self.response_drivers = []
-        self._block_response = False
 
     @property
     @run_remotely
@@ -86,26 +76,6 @@ class RPCRequestDriver(ConnectionDriver):
             out[k]['YGG_IS_SERVER'] = 'True'
         return out
         
-    def close_response_drivers(self):
-        r"""Close response driver."""
-        with self.lock:
-            self.debug("Closing response drivers.")
-            self._block_response = True
-            for x in self.response_drivers:
-                x.terminate()
-            self.response_drivers = []
-
-    def close_comm(self):
-        r"""Close response drivers."""
-        self.close_response_drivers()
-        super(RPCRequestDriver, self).close_comm()
-            
-    def printStatus(self, *args, **kwargs):
-        r"""Also print response drivers."""
-        super(RPCRequestDriver, self).printStatus(*args, **kwargs)
-        for x in self.response_drivers:
-            x.printStatus(*args, **kwargs)
-
     @run_remotely
     def remove_model(self, direction, name):
         r"""Remove a model from the list of models.
@@ -157,8 +127,7 @@ class RPCRequestDriver(ConnectionDriver):
         self.ocomm._send_serializer = True
 
     def send_message(self, msg, **kwargs):
-        r"""Start a response driver for a request message and send message with
-        header.
+        r"""Move response arguments to new header.
 
         Args:
             msg (CommMessage): Message being sent.
@@ -170,55 +139,11 @@ class RPCRequestDriver(ConnectionDriver):
         """
         if self.ocomm.is_closed:
             return False
-        # Start response driver
         if msg.flag != CommBase.FLAG_EOF:
-            with self.lock:
-                if (not self.is_comm_open) or self._block_response:  # pragma: debug
-                    self.debug("Comm closed, not creating response driver.")
-                    return False
-                drv_args = [msg.header['response_address'],
-                            msg.header['request_id']]
-                drv_kwargs = dict(
-                    request_name=self.name,
-                    inputs=[self.response_kwargs.copy()],
-                    outputs=[{'commtype': msg.header["commtype"]}])
-                self.debug("Creating response comm: address = %s, request_id = %s",
-                           msg.header['response_address'], msg.header['request_id'])
-                try:
-                    response_driver = RPCResponseDriver(*drv_args, **drv_kwargs)
-                    self.response_drivers.append(response_driver)
-                    response_driver.start()
-                    self.debug("Started response comm: address = %s, request_id = %s",
-                               msg.header['response_address'], msg.header['request_id'])
-                except BaseException:  # pragma: debug
-                    self.exception("Could not create/start response driver.")
-                    return False
             # Send response address in header
             kwargs.setdefault('header_kwargs', {})
             kwargs['header_kwargs'].setdefault(
-                'response_address', response_driver.response_address)
+                'response_address', msg.header['response_address'])
             kwargs['header_kwargs'].setdefault('request_id', msg.header['request_id'])
             kwargs['header_kwargs'].setdefault('model', msg.header.get('model', ''))
         return super(RPCRequestDriver, self).send_message(msg, **kwargs)
-
-    def run_loop(self):
-        r"""Run the driver. Continue looping over messages until there are not
-        any left or the communication channel is closed.
-        """
-        super(RPCRequestDriver, self).run_loop()
-        if not self.was_break:
-            self.prune_response_drivers()
-
-    def prune_response_drivers(self):
-        r"""Remove response drivers that are no longer being used."""
-        with self.lock:
-            remove_idx = []
-            for i, x in enumerate(self.response_drivers):
-                self.errors += x.errors
-                if (((not x.is_alive())
-                     and x.icomm.is_confirmed_recv
-                     and x.ocomm.is_confirmed_send)):
-                    x.cleanup()
-                    remove_idx.append(i)
-            for i in remove_idx[::-1]:
-                self.response_drivers.pop(i)

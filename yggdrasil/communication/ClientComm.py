@@ -1,4 +1,5 @@
 import uuid
+from collections import OrderedDict
 from yggdrasil.communication import CommBase, new_comm, get_comm, import_comm
 
 
@@ -18,9 +19,10 @@ class ClientComm(CommBase.CommBase):
 
     Attributes:
         response_kwargs (dict): Keyword arguments for the response comm.
-        icomm (dict): Response comms keyed to the ID of the associated request.
-        icomm_order (list): Response comm keys in the order or the requests.
+        request_order (list): Order of request IDs.
+        responses (dict): Mapping between request IDs and response messages.
         ocomm (Comm): Request comm.
+        icomm (Comm): Response comm.
 
     """
 
@@ -43,8 +45,9 @@ class ClientComm(CommBase.CommBase):
         self.direct_connection = direct_connection
         self.response_kwargs = response_kwargs
         self.ocomm = get_comm(ocomm_name, **ocomm_kwargs)
-        self.icomm = dict()
-        self.icomm_order = []
+        self.icomm = None
+        self.request_order = []
+        self.responses = OrderedDict()
         self.response_kwargs.setdefault('commtype', self.ocomm._commtype)
         self.response_kwargs.setdefault('recv_timeout', self.ocomm.recv_timeout)
         self.response_kwargs.setdefault('language', self.ocomm.language)
@@ -75,8 +78,7 @@ class ClientComm(CommBase.CommBase):
         lines.append('%s%-15s:' % (prefix, 'request comm'))
         lines += self.ocomm.get_status_message(nindent=(nindent + 1))[0]
         lines.append('%s%-15s:' % (prefix, 'response comms'))
-        for x in self.icomm.values():
-            lines += x.get_status_message(nindent=(nindent + 1))[0]
+        lines += self.icomm.get_status_message(nindent=(nindent + 1))[0]
         return lines, prefix
     
     @classmethod
@@ -163,8 +165,8 @@ class ClientComm(CommBase.CommBase):
     def close(self, *args, **kwargs):
         r"""Close the connection."""
         self.ocomm.close(*args, **kwargs)
-        for k in self.icomm_order:
-            self.icomm[k].close()
+        if self.icomm is not None:
+            self.icomm.close(*args, **kwargs)
         super(ClientComm, self).close(*args, **kwargs)
 
     @property
@@ -195,24 +197,18 @@ class ClientComm(CommBase.CommBase):
     # RESPONSE COMM
     def create_response_comm(self):
         r"""Create a response comm based on information from the last header."""
-        comm_kwargs = dict(direction='recv', is_response_client=True,
-                           single_use=True, **self.response_kwargs)
-        if comm_kwargs.get('use_async', False):
-            comm_kwargs['async_recv_method'] = 'recv_message'
         header = dict(request_id=str(uuid.uuid4()))
-        while header['request_id'] in self.icomm:  # pragma: debug
+        while header['request_id'] in self.request_order:  # pragma: debug
             header['request_id'] += str(uuid.uuid4())
-        c = new_comm('client_response_comm.' + header['request_id'], **comm_kwargs)
-        header['response_address'] = c.address
-        self.icomm[header['request_id']] = c
-        self.icomm_order.append(header['request_id'])
+        if self.icomm is None:
+            comm_kwargs = dict(direction='recv', is_response_client=True,
+                               **self.response_kwargs)
+            if comm_kwargs.get('use_async', False):
+                comm_kwargs['async_recv_method'] = 'recv_message'
+            self.icomm = new_comm(self.name + '.client_response_comm', **comm_kwargs)
+        header['response_address'] = self.icomm.address
+        self.request_order.append(header['request_id'])
         return header
-
-    def remove_response_comm(self):
-        r"""Remove response comm."""
-        key = self.icomm_order.pop(0)
-        icomm = self.icomm.pop(key)
-        icomm.close()
 
     # SEND METHODS
     def prepare_message(self, *args, **kwargs):
@@ -266,11 +262,19 @@ class ClientComm(CommBase.CommBase):
             CommMessage: Received message.
 
         """
-        if len(self.icomm) == 0:  # pragma: debug
-            raise RuntimeError("There are not any registered response comms.")
-        out = self.icomm[self.icomm_order[0]].recv_message(*args, **kwargs)
-        self.errors += self.icomm[self.icomm_order[0]].errors
-        return out
+        if not self.request_order:  # pragma: debug
+            raise RuntimeError("There are not any requests registered.")
+        while self.responses.get(self.request_order[0], None) is None:
+            msg = self.icomm.recv_message(*args, **kwargs)
+            self.errors += self.icomm.errors
+            if msg != CommBase.FLAG_SUCCESS:
+                break
+            assert(msg.header['request_id'] not in self.responses)
+            self.responses[msg.header['request_id']] = msg
+        if self.request_order[0] in self.responses:
+            msg = self.responses.pop(self.request_order[0])
+            self.request_order.pop(0)
+        return msg
 
     def finalize_message(self, msg, **kwargs):
         r"""Perform actions to decipher a message.
@@ -284,12 +288,9 @@ class ClientComm(CommBase.CommBase):
             CommMessage: Deserialized and annotated message.
 
         """
-        if len(self.icomm) == 0:  # pragma: debug
+        if self.icomm is None:  # pragma: debug
             raise RuntimeError("There are not any registered response comms.")
-        msg = self.icomm[self.icomm_order[0]].finalize_message(msg, **kwargs)
-        if msg.flag in [CommBase.FLAG_SUCCESS, CommBase.FLAG_FAILURE]:
-            self.remove_response_comm()
-        return msg
+        return self.icomm.finalize_message(msg, **kwargs)
         
     # CALL
     def call(self, *args, **kwargs):
@@ -330,11 +331,3 @@ class ClientComm(CommBase.CommBase):
         r"""Sleep while waiting for messages to be drained."""
         if direction == 'send':
             self.ocomm.drain_messages(direction='send', **kwargs)
-
-    # def purge(self):
-    #     r"""Purge input and output comms."""
-    #     self.ocomm.purge()
-    #     # Unsure if client should purge all input comms...
-    #     # for k in self.icomm_order:
-    #     #     self.icomm[k].purge()
-    #     super(ClientComm, self).purge()
