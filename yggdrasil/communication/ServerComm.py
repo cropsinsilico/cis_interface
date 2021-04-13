@@ -5,6 +5,16 @@ from yggdrasil.communication import CommBase, get_comm, import_comm
 from yggdrasil.drivers.RPCRequestDriver import YGG_CLIENT_EOF
 
 
+class Request(object):
+
+    __slots__ = ['response_address', 'request_id']
+
+    def __init__(self, response_address, request_id):
+        self.response_address = response_address
+        self.request_id = request_id
+        super(Request, self).__init__()
+
+
 class ServerComm(CommBase.CommBase):
     r"""Class for handling Server side communication.
 
@@ -47,6 +57,7 @@ class ServerComm(CommBase.CommBase):
         self.response_kwargs = response_kwargs
         self.icomm = get_comm(icomm_name, **icomm_kwargs)
         self.ocomm = OrderedDict()
+        self.requests = OrderedDict()
         self.response_kwargs.setdefault('commtype', self.icomm._commtype)
         self.response_kwargs.setdefault('recv_timeout', self.icomm.recv_timeout)
         self.response_kwargs.setdefault('language', self.icomm.language)
@@ -210,37 +221,26 @@ class ServerComm(CommBase.CommBase):
         elif 'response_address' not in header:  # pragma: debug
             raise RuntimeError("Last header does not contain response address.")
         comm_kwargs = dict(address=header['response_address'],
-                           direction='send',
-                           single_use=True, **self.response_kwargs)
-        if self.direct_connection:
-            comm_kwargs['is_response_client'] = True
-        else:
-            comm_kwargs['is_response_server'] = True
+                           direction='send', is_response_client=True,
+                           **self.response_kwargs)
+        # if self.direct_connection:
+        #     comm_kwargs['is_response_client'] = True
+        # else:
+        #     comm_kwargs['is_response_server'] = True
         response_id = header['request_id']
         while response_id in self.ocomm:  # pragma: debug
             response_id += str(uuid.uuid4())
         header['response_id'] = response_id
-        self.ocomm[response_id] = get_comm(
-            self.name + '.server_response_comm.' + response_id,
-            **comm_kwargs)
-        client_model = header.get('model', '')
-        self.ocomm[response_id].client_model = client_model
-        self.ocomm[response_id].request_id = header['request_id']
-        if client_model and (client_model not in self.clients):
-            self.clients.append(client_model)
-
-    def remove_response_comm(self, response_id):
-        r"""Remove response comm.
-
-        Args:
-            response_id (str): The ID used to register the response
-                comm that should be removed.
-
-        """
-        ocomm = self.ocomm.pop(response_id, None)
-        if ocomm is not None:
-            ocomm.close_in_thread(no_wait=True)
-            self._used_response_comms[ocomm.name] = ocomm
+        if header['response_address'] not in self.ocomm:
+            self.ocomm[header['response_address']] = get_comm(
+                self.name + '.server_response_comm.' + response_id,
+                **comm_kwargs)
+            client_model = header.get('model', '')
+            self.ocomm[header['response_address']].client_model = client_model
+            if client_model and (client_model not in self.clients):
+                self.clients.append(client_model)
+        self.requests[response_id] = Request(header['response_address'],
+                                             header['request_id'])
 
     # SEND METHODS
     def send_to(self, response_id, *args, **kwargs):
@@ -271,15 +271,17 @@ class ServerComm(CommBase.CommBase):
             CommMessage: Serialized and annotated message.
 
         """
-        if len(self.ocomm) == 0:  # pragma: debug
-            raise RuntimeError("There is no registered response comm.")
+        if len(self.requests) == 0:  # pragma: debug
+            raise RuntimeError("There is no registered request.")
         kwargs.setdefault('header_kwargs', {})
         response_id = kwargs['header_kwargs'].get('response_id', None)
         if response_id is None:
-            response_id = next(iter(self.ocomm.keys()))
+            response_id = next(iter(self.requests.keys()))
             kwargs['header_kwargs']['response_id'] = response_id
-        kwargs['header_kwargs']['request_id'] = self.ocomm[response_id].request_id
-        return self.ocomm[response_id].prepare_message(*args, **kwargs)
+        request = self.requests[response_id]
+        kwargs['header_kwargs']['request_id'] = request.request_id
+        return self.ocomm[request.response_address].prepare_message(
+            *args, **kwargs)
         
     def send_message(self, msg, **kwargs):
         r"""Send a message encapsulated in a CommMessage object.
@@ -294,12 +296,11 @@ class ServerComm(CommBase.CommBase):
         
         """
         response_id = msg.header['response_id']
-        out = self.ocomm[response_id].send_message(msg, **kwargs)
-        self.errors += self.ocomm[response_id].errors
+        response_comm = self.ocomm[self.requests[response_id].response_address]
+        out = response_comm.send_message(msg, **kwargs)
+        self.errors += response_comm.errors
         if out:
-            # Don't close here on failure which will allow send to be called
-            # again in async or driver loop
-            self.remove_response_comm(response_id)
+            self.requests.pop(response_id)
         return out
                                                   
     # RECV METHODS

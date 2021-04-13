@@ -153,6 +153,7 @@ static inline
 zsock_t* create_zsock(int type) {
   zsock_t* out = ygg_zsock_new(type);
   zsock_set_linger(out, 0);
+  zsock_set_immediate(out, 1);
   return out;
 };
   

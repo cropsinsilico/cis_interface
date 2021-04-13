@@ -15,6 +15,208 @@ extern "C" {
 // Info is response
 static unsigned _client_rand_seeded = 0;
 
+// @brief Structure for storing requests/responses
+typedef struct responses_t {
+  comm_t* comm; //!< Response comm.
+  size_t nreq; //!< Number of requests sent.
+  char** request_id; //!< Request ids.
+  char** data; //!< Received responses
+  size_t* len; //!< Lengths of received messages.
+} responses_t;
+  
+/*!
+  @brief Create a new registry of requests and responses.
+  @returns responses_t* Structure containing a registry of requests and
+  responses.
+*/
+static inline
+responses_t* new_responses() {
+  responses_t* out = (responses_t*)malloc(sizeof(responses_t));
+  if (out != NULL) {
+    out->comm = NULL;
+    out->nreq = 0;
+    out->request_id = NULL;
+    out->data = NULL;
+    out->len = NULL;
+  }
+  return out;
+};
+
+/*!
+  @brief Determine if there is a request in the registry.
+  @param[in] x responses_t** Pointer to structure containing a registry of
+  requests and responses.
+*/
+static inline
+void free_responses(responses_t** x) {
+  if (x[0] != NULL) {
+    if (x[0]->comm != NULL) {
+      free_default_comm(x[0]->comm);
+      free_comm_base(x[0]->comm);
+    }
+    if (x[0]->data != NULL) {
+      for (size_t i = 0; i < x[0]->nreq; i++)
+	if (x[0]->data[i] != NULL) free(x[0]->data[i]);
+      free(x[0]->data);
+    }
+    if (x[0]->len != NULL)
+      free(x[0]->len);
+    free(x[0]);
+    x[0] = NULL;
+  }
+};
+
+/*!
+  @brief Determine if there is a request in the registry.
+  @param[in] x responses_t* Structure containing a registry of requests and
+  responses.
+  @param[in] request_id const char* ID associated with the request to check for.
+  @returns int -1 if there is an error, otherwise the index of the request
+  in the registry.
+*/
+static inline
+int has_request(responses_t *x, const char* request_id) {
+  if (x == NULL) return 0;
+  for (size_t i = 0; i < x->nreq; i++) {
+    if (strcmp(x->request_id[i], request_id) == 0)
+      return (int)i;
+  }
+  return -1;
+};
+
+/*!
+  @brief Determine if there is a response in the registry.
+  @param[in] x responses_t* Structure containing a registry of requests and
+  responses.
+  @param[in] request_id const char* ID associated with the response to check for.
+  @returns int -1 if there is an error, otherwise the index of the response
+  in the registry.
+*/
+static inline
+int has_response(responses_t *x, const char* request_id) {
+  int idx = has_request(x, request_id);
+  if (idx < 0) return idx;
+  if (x->data[idx] != NULL) return idx;
+  return -1;
+};
+
+/*!
+  @brief Add a request to the registry.
+  @param[in] x responses_t* Structure containing a registry of requests and
+  responses.
+  @param[in] request_id const char* ID associated with the request being added.
+  @returns int -1 if there is an error, 0 otherwise.
+*/
+static inline
+int add_request(responses_t *x, const char* request_id) {
+  if (x == NULL) return -1;
+  x->request_id = (char**)realloc(x->request_id, (x->nreq + 1) * sizeof(char*));
+  if (x->request_id == NULL) return -1;
+  size_t request_len = strlen(request_id);
+  x->request_id[x->nreq] = (char*)malloc(request_len + 1);
+  if (x->request_id[x->nreq] == NULL) return -1;
+  memcpy(x->request_id[x->nreq], request_id, request_len);
+  x->request_id[x->nreq][request_len] = '\0';
+  x->data = (char**)realloc(x->data, (x->nreq + 1) * sizeof(char*));
+  if (x->data == NULL) return -1;
+  x->data[x->nreq] = NULL;
+  x->len = (size_t*)realloc(x->len, (x->nreq + 1) * sizeof(size_t));
+  if (x->len == NULL) return -1;
+  x->len[x->nreq] = 0;
+  x->nreq++;
+  return 0;
+};
+
+/*!
+  @brief Add a response to the registry.
+  @param[in] x responses_t* Structure containing a registry of requests and
+  responses.
+  @param[in] request_id const char* ID associated with the response being added.
+  @param[in] data const char* Response message.
+  @param[in] len size_t Size of the response message.
+  @returns int -1 if there is an error, 0 otherwise.
+*/
+static inline
+int add_response(responses_t *x, const char* request_id, const char* data,
+		 const size_t len) {
+  int idx = has_request(x, request_id);
+  if (idx < 0) return idx;
+  x->data[idx] = (char*)malloc(len + 1);
+  if (x->data[idx] == NULL) return -1;
+  memcpy(x->data[idx], data, len);
+  x->data[idx][len] = '\0';
+  x->len[idx] = len;
+  return 0;
+};
+
+/*!
+  @brief Remove a request/response from the registry.
+  @param[in] x responses_t* Structure containing a registry of requests and
+  responses.
+  @param[in] request_id const char* ID associated with the request/response
+  that should be removed.
+  @returns int -1 if there is an error, 0 otherwise.
+*/
+static inline
+int remove_request(responses_t *x, const char* request_id) {
+  if (x == NULL) return -1;
+  int idx = has_request(x, request_id);
+  if (idx < 0) return 0;
+  int nrem = x->nreq - (idx + 1);
+  free(x->request_id[idx]);
+  if (x->data[idx] != NULL) free(x->data[idx]);
+  if (nrem > 0) {
+    memmove(x->request_id + idx, x->request_id + idx + 1, nrem * sizeof(char*));
+    memmove(x->data + idx, x->data + idx + 1, nrem * sizeof(char*));
+    memmove(x->len + idx, x->len + idx + 1, nrem * sizeof(size_t));
+  }
+  x->nreq--;
+  return 0;
+};
+
+/*!
+  @brief Remove and return a response from the registry after it has been received.
+  @param[in] x responses_t* Structure containing a registry of requests and
+  responses.
+  @param[in] request_id const char* ID associated with the response that
+  should be removed and returned.
+  @param[in,out] data char** Pointer to memory where the response should be stored.
+  @param[in] len const size_t Size of the existing buffer pointed to by data.
+  @param[in] allow_realloc int If 1 and the response exceeds len, the buffer
+  pointed to by data will be reallocated, if 0 and the response exceeds len,
+  an error will be returned.
+  @returns int -1 if there is an error, otherwise the size of the reponse
+  message will be returned.
+*/
+static inline
+int pop_response(responses_t *x, const char* request_id, char **data,
+		 const size_t len, const int allow_realloc) {
+  if (x == NULL) return -1;
+  int idx = has_response(x, request_id);
+  if (idx < 0) return -1;
+  int ret = x->len[idx];
+  if ((ret + 1) > len) {
+    if (allow_realloc) {
+      ygglog_debug("pop_response: reallocating buffer from %d to %d bytes.",
+		   len, ret + 1);
+      (*data) = (char*)realloc(*data, ret + 1);
+      if (*data == NULL) {
+	ygglog_error("pop_response: failed to realloc buffer.");
+	return -1;
+      }
+    } else {
+      ygglog_error("pop_response: buffer (%d bytes) is not large enough for message (%d bytes)",
+		   len, ret + 1);
+      return -((int)(ret));
+    }
+  }
+  memcpy(*data, x->data[idx], ret);
+  (*data)[ret] = '\0';
+  if (remove_request(x, request_id) < 0) return -1;
+  return ret;
+};
+
+
 /*!
   @brief Create a new channel.
   @param[in] comm comm_t * Comm structure initialized with new_comm_base.
@@ -83,70 +285,15 @@ int init_client_comm(comm_t *comm) {
   strcpy(comm->address, handle->address);
   comm->handle = (void*)handle;
   // Keep track of response comms
-  int *ncomm = (int*)malloc(sizeof(int));
-  if (ncomm == NULL) {
-    ygglog_error("init_client_comm: Failed to malloc ncomm.");
+  responses_t *resp = new_responses();
+  if (resp == NULL) {
+    ygglog_error("init_client_comm: Failed to malloc responses.");
     return -1;
   }
-  ncomm[0] = 0;
-  handle->info = (void*)ncomm;
+  comm->info = (void*)resp;
   strcpy(comm->direction, "send");
   comm->flags = comm->flags | COMM_ALWAYS_SEND_HEADER;
-  comm_t ***info = (comm_t***)malloc(sizeof(comm_t**));
-  if (info == NULL) {
-    ygglog_error("init_client_comm: Failed to malloc info.");
-    return -1;
-  }
-  info[0] = NULL;
-  comm->info = (void*)info;
   return ret;
-};
-
-static inline
-int get_client_response_count(const comm_t* x) {
-  comm_t *handle = (comm_t*)(x->handle);
-  int out = 0;
-  if (handle != NULL) {
-    out = ((int*)(handle->info))[0];
-  }
-  return out;
-};
-
-static inline
-void set_client_response_count(const comm_t* x, const int new_val) {
-  comm_t *handle = (comm_t*)(x->handle);
-  if (handle != NULL) {
-    int *count = (int*)(handle->info);
-    count[0] = new_val;
-  }
-};
-
-static inline
-void inc_client_response_count(const comm_t* x) {
-  comm_t *handle = (comm_t*)(x->handle);
-  if (handle != NULL) {
-    int *count = (int*)(handle->info);
-    count[0]++;
-  }
-};
-
-static inline
-void dec_client_response_count(const comm_t* x) {
-  comm_t *handle = (comm_t*)(x->handle);
-  if (handle != NULL) {
-    int *count = (int*)(handle->info);
-    count[0]--;
-  }
-};
-
-static inline
-void free_client_response_count(comm_t *x) {
-  comm_t *handle = (comm_t*)(x->handle);
-  if (handle != NULL) {
-    int *count = (int*)(handle->info);
-    free(count);
-    handle->info = NULL;
-  }
 };
 
 /*!
@@ -157,24 +304,11 @@ void free_client_response_count(comm_t *x) {
 static inline
 int free_client_comm(comm_t *x) {
   if (x->info != NULL) {
-    comm_t ***info = (comm_t***)(x->info);
-    if (info[0] != NULL) {
-      int ncomm = get_client_response_count(x);
-      int i;
-      for (i = 0; i < ncomm; i++) {
-        if (info[0][i] != NULL) {
-          free_default_comm(info[0][i]);
-	  free_comm_base(info[0][i]);
-          free(info[0][i]);
-        }
-      }
-      free(*info);
-      info[0] = NULL;
-    }
-    free(info);
+    responses_t *resp = (responses_t*)(x->info);
+    if (resp != NULL)
+      free_responses(&resp);
     x->info = NULL;
   }
-  free_client_response_count(x);
   if (x->handle != NULL) {
     comm_t *handle = (comm_t*)(x->handle);
     free_default_comm(handle);
@@ -207,31 +341,30 @@ int client_comm_nmsg(const comm_t* x) {
 static inline
 comm_head_t client_response_header(const comm_t* x, comm_head_t head) {
   // Initialize new comm
-  int ncomm = get_client_response_count(x);
-  comm_t ***res_comm = (comm_t***)(x->info);
-  res_comm[0] = (comm_t**)realloc(res_comm[0], sizeof(comm_t*)*(ncomm + 1));
-  if (res_comm[0] == NULL) {
-    ygglog_error("client_response_header: Failed to realloc response comm.");
-    head.flags = head.flags & ~HEAD_FLAG_VALID;
-    return head;
+  responses_t *resp = (responses_t*)(x->info);
+  if (resp->comm == NULL) {
+    dtype_t * dtype_copy = copy_dtype(x->datatype);
+    resp->comm = new_comm_base(NULL, "recv", _default_comm, dtype_copy);
+    resp->comm->flags = resp->comm->flags | COMM_FLAG_CLIENT_RESPONSE;
+    int ret = new_default_address(resp->comm);
+    if (ret < 0) {
+      ygglog_error("client_response_header(%s): could not create response comm", x->name);
+      head.flags = head.flags & ~HEAD_FLAG_VALID;
+      return head;
+    }
+    resp->comm->const_flags[0] = resp->comm->const_flags[0] | COMM_EOF_SENT | COMM_EOF_RECV;
+    ygglog_debug("client_response_header(%s): Created response comm",
+		 x->name);
   }
-  dtype_t * dtype_copy = copy_dtype(x->datatype);
-  res_comm[0][ncomm] = new_comm_base(NULL, "recv", _default_comm, dtype_copy);
-  res_comm[0][ncomm]->flags = res_comm[0][ncomm]->flags | COMM_FLAG_CLIENT_RESPONSE;
-  int ret = new_default_address(res_comm[0][ncomm]);
-  if (ret < 0) {
-    ygglog_error("client_response_header(%s): could not create response comm", x->name);
-    head.flags = head.flags & ~HEAD_FLAG_VALID;
-    return head;
-  }
-  res_comm[0][ncomm]->const_flags[0] = res_comm[0][ncomm]->const_flags[0] | COMM_EOF_SENT | COMM_EOF_RECV;
-  inc_client_response_count(x);
-  ncomm = get_client_response_count(x);
-  ygglog_debug("client_response_header(%s): Created response comm number %d",
-	       x->name, ncomm);
   // Add address & request ID to header
-  strcpy(head.response_address, res_comm[0][ncomm - 1]->address);
+  strcpy(head.response_address, resp->comm->address);
   sprintf(head.request_id, "%d", rand());
+  if (add_request(resp, head.request_id) < 0) {
+    ygglog_error("client_response_header(%s): Failed to add request",
+		 x->name);
+    head.flags = head.flags & ~HEAD_FLAG_VALID;
+    return head;
+  }
   ygglog_debug("client_response_header(%s): response_address = %s, request_id = %s",
 	       x->name, head.response_address, head.request_id);
   return head;
@@ -274,26 +407,41 @@ int client_comm_send(const comm_t* x, const char *data, const size_t len) {
 static inline
 int client_comm_recv(const comm_t* x, char **data, const size_t len, const int allow_realloc) {
   ygglog_debug("client_comm_recv(%s)", x->name);
-  if ((x->info == NULL) || (get_client_response_count(x) == 0)) {
+  if (x->info == NULL) {
+    ygglog_error("client_comm_recv(%s): no response struct set up", x->name);
+    return -1;
+  }
+  responses_t *resp = (responses_t*)(x->info);
+  if ((resp->comm == NULL) || (resp->nreq == 0)) {
     ygglog_error("client_comm_recv(%s): no response comm registered", x->name);
     return -1;
   }
-  comm_t ***res_comm = (comm_t***)(x->info);
-  int ret = default_comm_recv(res_comm[0][0], data, len, allow_realloc);
-  if (ret < 0) {
-    ygglog_error("client_comm_recv(%s): default_comm_recv returned %d",
-		 x->name, ret);
-    return ret;
+  char* request_id = resp->request_id[0];
+  int ret = 0;
+  while (has_response(resp, request_id) < 0) {
+    ret = default_comm_recv(resp->comm, data, len, allow_realloc);
+    if (ret < 0) {
+      ygglog_error("client_comm_recv(%s): default_comm_recv returned %d",
+		   x->name, ret);
+      return ret;
+    }
+    comm_head_t head = parse_comm_header(*data, len);
+    if (!(head.flags & HEAD_FLAG_VALID)) {
+      ygglog_error("client_comm_recv(%s): Invalid header.", x->name);
+      return -1;
+    }
+    if (strcmp(head.request_id, request_id) == 0) {
+      ygglog_debug("client_comm_recv(%s): default_comm_recv returned %d",
+		   x->name, ret);
+      if (remove_request(resp, request_id) < 0) return -1;
+      return ret;
+    }
+    if (add_response(resp, head.request_id, *data, ret) < 0) return -1;
   }
+  ret = pop_response(resp, request_id, data, len, allow_realloc);
   // Close response comm and decrement count of response comms
-  ygglog_debug("client_comm_recv(%s): default_comm_recv returned %d",
+  ygglog_debug("client_comm_recv(%s): pop_response returned %d",
 	       x->name, ret);
-  free_default_comm(res_comm[0][0]);
-  free_comm_base(res_comm[0][0]);
-  free(res_comm[0][0]);
-  dec_client_response_count(x);
-  int nresp = get_client_response_count(x);
-  memmove(*res_comm, *res_comm + 1, nresp*sizeof(comm_t*));
   return ret;
 };
 
