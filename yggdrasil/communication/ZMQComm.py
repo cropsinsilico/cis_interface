@@ -477,7 +477,6 @@ class ZMQComm(CommBase.CommBase):
             else:
                 socket_action = 'connect'
         if new_process:
-            self.info("NEW CONTEXT")
             self.context = zmq.Context()
             set_context_opts(self.context)
         else:
@@ -777,6 +776,7 @@ class ZMQComm(CommBase.CommBase):
         r"""Set the send reply socket if it dosn't exist."""
         if self.reply_socket_send is None:
             s = create_socket(self.context, zmq.REP)
+            s.setsockopt(zmq.IMMEDIATE, 1)
             address = format_address(_default_protocol, 'localhost')
             address = bind_socket(s, address)
             self.register_comm('REPLY_SEND_' + address, s)
@@ -791,6 +791,7 @@ class ZMQComm(CommBase.CommBase):
         address = tools.bytes2str(address)
         if address not in self.reply_socket_recv:
             s = create_socket(self.context, zmq.REQ)
+            s.setsockopt(zmq.IMMEDIATE, 1)
             s.connect(address)
             self.register_comm('REPLY_RECV_' + address, s)
             with self.reply_socket_lock:
