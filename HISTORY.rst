@@ -2,6 +2,11 @@
 History
 =======
 
+X.X.X (XXXX-XX-XX)
+------------------
+
+* Removed use of response driver and updated client/server comms to reuse response comms.
+
 1.6.0 (2021-04-14) Single connection, async refactor, threading, & model copies
 ------------------
 
