@@ -440,10 +440,12 @@ class ZMQComm(CommBase.CommBase):
             socket_type = 'DEALER'
             socket_action = 'connect'
             self.direction = 'recv'
-        elif self.is_response_client and (self.direction == 'recv'):
+        elif ((self.is_response_client or self.is_response_server)
+              and (self.direction == 'recv')):
             socket_type = 'ROUTER'
             socket_action = 'bind'
-        elif self.is_response_client and (self.direction == 'send'):
+        elif ((self.is_response_client or self.is_response_server)
+              and (self.direction == 'send')):
             # The would be the RPCResponseDriver output comm that
             # partners with the ClientComm response comm that is set
             # to use a ROUTER socket type as defined above
@@ -456,7 +458,7 @@ class ZMQComm(CommBase.CommBase):
             elif self.direction == 'send':
                 socket_type = _socket_send_types[_default_socket_type]
         if not (self.allow_multiple_comms or self.is_client or self.is_server
-                or self.is_response_client):
+                or self.is_response_client or self.is_response_server):
             if socket_type in ['PULL', 'SUB', 'REP', 'DEALER']:
                 self.direction = 'recv'
             elif socket_type in ['PUSH', 'PUB', 'REQ', 'ROUTER']:

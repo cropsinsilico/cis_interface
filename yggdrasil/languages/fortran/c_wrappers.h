@@ -10,6 +10,7 @@ extern "C" {
 const int YGG_MSG_MAX_F = YGG_MSG_MAX;
 
 // Utilities
+int ygg_init_f();
 void ygg_c_free(void *x);
 void ygg_log_info_f(const char* fmt);
 void ygg_log_debug_f(const char* fmt);

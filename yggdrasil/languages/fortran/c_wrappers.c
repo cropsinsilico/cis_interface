@@ -1,6 +1,10 @@
 #include "c_wrappers.h"
 
 // Utilities
+int ygg_init_f() {
+  return ygg_init();
+}
+
 void ygg_c_free(void *x) {
   if (x != NULL) {
     free(x);

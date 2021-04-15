@@ -10,7 +10,7 @@ int model_function(char *in_buf, uint64_t length_in_buf,
   std::cout << "client(C++): " << in_buf << " (length = " << length_in_buf << ")" << std::endl;
   int ret = rpc.callRealloc(4, in_buf, length_in_buf, &out_buf, &length_out_buf);
   if (ret < 0) {
-    printf("client(C++): RPC CALL ERROR\n");
+    std::cout << "client(C++): RPC CALL ERROR" << std::endl;
     return -1;
   }
   return 0;

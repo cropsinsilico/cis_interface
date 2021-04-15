@@ -1,0 +1,8 @@
+---
+
+model:
+  name: server
+  language: R
+  args: ./src/server.R
+  function: model_function
+  is_server: True  # Creates a RPC server queue called "server"

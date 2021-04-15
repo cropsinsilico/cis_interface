@@ -34,8 +34,8 @@ def main():
     inp = YggInput("params")
     retval, params = inp.recv()
     if not retval:
-        raise RuntimeError('server: ERROR receiving parameters')
-    print('server: Parameters = %s' % params)
+        raise RuntimeError('server(P): ERROR receiving parameters')
+    print('server(P): Parameters = %s' % params)
 
     # Create server-side rpc conneciton using model name
     rpc = YggRpcServer("server", "%d", "%d")
@@ -43,22 +43,22 @@ def main():
     # Continue receiving requests until the connection is closed when all
     # clients have disconnected.
     while True:
-        print('server: receiving...')
+        print('server(P): receiving...')
         retval, rpc_in = rpc.recv()
         if not retval:
-            print('server: end of input')
+            print('server(P): end of input')
             break
 
         # Compute fibonacci number
         n = rpc_in[0]
-        print('server: Received request for Fibonacci number %d' % n)
+        print('server(P): Received request for Fibonacci number %d' % n)
         result = get_fibonacci(n)
-        print('server: Sending response for Fibonacci number %d: %d' % (n, result))
+        print('server(P): Sending response for Fibonacci number %d: %d' % (n, result))
 
         # Send response back
         flag = rpc.send(np.int32(result))
         if not flag:
-            raise RuntimeError('server: ERROR sending')
+            raise RuntimeError('server(P): ERROR sending')
 
     print('Goodbye from Python server')
 
