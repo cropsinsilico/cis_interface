@@ -13,7 +13,7 @@ class TestRPCRequestParam(parent.TestConnectionParam):
         super(TestRPCRequestParam, self).__init__(*args, **kwargs)
         self.driver = 'RPCRequestDriver'
         self.args = None
-        self.attr_list += ['clients']
+        self.attr_list += ['response_drivers', 'clients']
         # Increased to allow forwarding between IPC comms on MacOS
         self.timeout = 5.0
         self.route_timeout = 2 * self.timeout

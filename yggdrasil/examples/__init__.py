@@ -108,9 +108,10 @@ def register_example(example_dir):
                          '%sSrv%s' % (example_base, ext_map[lang_set[1]])]
         elif example_base.startswith('rpc_'):
             # TODO: Create server examples in other languages
-            yml_names = ['server_python.yml',
+            yml_names = ['server_%s.yml' % lang,
                          'client_%s.yml' % lang]
-            src_names = ['server.py', 'client%s' % ext_map[lang]]
+            src_names = ['server%s' % ext_map[lang],
+                         'client%s' % ext_map[lang]]
         elif example_base == 'root_to_shoot':
             if lang.startswith('all'):
                 yml_names = ['root.yml', 'shoot.yml', 'root_to_shoot.yml']

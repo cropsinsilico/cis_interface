@@ -58,6 +58,7 @@ class ServerComm(CommBase.CommBase):
         self.icomm = get_comm(icomm_name, **icomm_kwargs)
         self.ocomm = OrderedDict()
         self.requests = OrderedDict()
+        self.response_kwargs.setdefault('is_interface', self.icomm.is_interface)
         self.response_kwargs.setdefault('commtype', self.icomm._commtype)
         self.response_kwargs.setdefault('recv_timeout', self.icomm.recv_timeout)
         self.response_kwargs.setdefault('language', self.icomm.language)
@@ -221,12 +222,12 @@ class ServerComm(CommBase.CommBase):
         elif 'response_address' not in header:  # pragma: debug
             raise RuntimeError("Last header does not contain response address.")
         comm_kwargs = dict(address=header['response_address'],
-                           direction='send', is_response_client=True,
+                           direction='send',
                            **self.response_kwargs)
-        # if self.direct_connection:
-        #     comm_kwargs['is_response_client'] = True
-        # else:
-        #     comm_kwargs['is_response_server'] = True
+        if self.direct_connection:
+            comm_kwargs['is_response_client'] = True
+        else:
+            comm_kwargs['is_response_server'] = True
         response_id = header['request_id']
         while response_id in self.ocomm:  # pragma: debug
             response_id += str(uuid.uuid4())

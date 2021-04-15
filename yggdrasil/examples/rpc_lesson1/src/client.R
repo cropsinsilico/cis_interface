@@ -3,7 +3,7 @@ library(yggdrasil)
 
 main <- function(iterations) {
 
-  fprintf('Hello from Python client: iterations = %d ', iterations)
+  fprintf('Hello from R client: iterations = %d', iterations)
 
   # Set up connections matching yaml
   # RPC client-side connection will be $(server_name)_$(client_name)

@@ -1,5 +1,11 @@
   interface
      ! Utilities
+     function ygg_init_c() result(out) bind(c, name="ygg_init_f")
+       use, intrinsic :: iso_c_binding, only: c_int
+       implicit none
+       integer(kind=c_int) :: out
+     end function ygg_init_c
+     
      subroutine c_free(x) bind(c, name="ygg_c_free")
        use, intrinsic :: iso_c_binding, only: c_ptr
        implicit none

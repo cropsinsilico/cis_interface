@@ -1832,7 +1832,7 @@ class CommBase(tools.YggClass):
                     else:
                         self.partner_copies -= 1
                 else:  # pragma: debug
-                    self.error("EOF SENT TWICE")
+                    self.debug("EOF SENT TWICE")
                     return False
         elif msg.flag == FLAG_SUCCESS:
             pass

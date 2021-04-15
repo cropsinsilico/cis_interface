@@ -16,32 +16,32 @@ case $1 in
 	;;
     -m | --matlab )
 	echo "Running Matlab"
-	yaml1='server_python.yml'
+	yaml1='server_matlab.yml'
 	yaml2='client_matlab.yml'
 	;;
     -c | --gcc )
 	echo "Running C"
-	yaml1='server_python.yml'
+	yaml1='server_c.yml'
 	yaml2='client_c.yml'
 	;;
     --cpp | --g++ )
 	echo "Running C++"
-	yaml1='server_python.yml'
+	yaml1='server_cpp.yml'
 	yaml2='client_cpp.yml'
 	;;
     -r | -R )
 	echo "Running R"
-	yaml1='server_python.yml'
+	yaml1='server_r.yml'
 	yaml2='client_r.yml'
 	;;
     -f | --fortran )
 	echo "Running Fortran"
-	yaml1='server_python.yml'
+	yaml1='server_fortran.yml'
 	yaml2='client_fortran.yml'
 	;;
 esac
 
-yggrun $yaml1 $yaml2
+yggrun $yaml1 $yaml2 $2
 
 outfile="${TMPDIR}client_output.txt"
 echo $outfile

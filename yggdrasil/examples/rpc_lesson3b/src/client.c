@@ -5,9 +5,13 @@
 
 int model_function(char* in_buf, uint64_t length_in_buf,
 		   char** out_buf, uint64_t* length_out_buf) {
+  // Initialize yggdrasil outside the threaded section
   ygg_init();
-  int error_code = 0;
+  
+  // Get the number of threads from an environment variable set in the yaml
   int nthreads = atoi(getenv("NTHREAD"));
+  
+  int error_code = 0;
 #ifdef _OPENMP
   omp_set_num_threads(nthreads);
 #pragma omp parallel for shared(error_code)

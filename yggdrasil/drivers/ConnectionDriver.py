@@ -591,7 +591,7 @@ class ConnectionDriver(Driver):
                                self.models['input'])
                     self.sleep(10 * self.sleeptime)
                 self.stop_timeout(key_suffix='.model_exit')
-            self.drain_input(timeout=self.timeout)
+                self.drain_input(timeout=self.timeout)
         if direction == 'input':
             if not errors:
                 self.wait_for_route(timeout=self.timeout)

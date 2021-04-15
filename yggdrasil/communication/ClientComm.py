@@ -48,6 +48,7 @@ class ClientComm(CommBase.CommBase):
         self.icomm = None
         self.request_order = []
         self.responses = OrderedDict()
+        self.response_kwargs.setdefault('is_interface', self.ocomm.is_interface)
         self.response_kwargs.setdefault('commtype', self.ocomm._commtype)
         self.response_kwargs.setdefault('recv_timeout', self.ocomm.recv_timeout)
         self.response_kwargs.setdefault('language', self.ocomm.language)

@@ -676,15 +676,17 @@ comm_head_t comm_send_multipart_header(const comm_t *x, const char * data,
   }
   const comm_t *x0;
   if (x->type == SERVER_COMM) {
-    comm_t **res_comm = (comm_t**)(x->info);
-    if (res_comm[0] == NULL) {
+    if (!(is_eof(data))) {
+      head = server_response_header(x, head);
+    }
+    x0 = server_get_comm((requests_t*)(x->info), 0);
+    if (x0 == NULL) {
       ygglog_error("comm_send_multipart_header(%s): no response comm registered",
 		   x->name);
       head.flags = head.flags & ~HEAD_FLAG_VALID;
       return head;
     }
-    x0 = &((*res_comm)[0]);
-    // Why was this necessary?
+    // This gives the server access to the ID of the message last received
     strcpy(head.id, x->address);
   } else if (x->type == CLIENT_COMM) {
     if (!(is_eof(data))) {
@@ -1161,7 +1163,7 @@ int comm_recv(comm_t *x, char *data, const size_t len) {
       ret = comm_recv_multipart(x, &data, len, ret, 0);
     }
   } else {
-    ygglog_error("comm_recv_realloc(%s): Failed to receive header or message.",
+    ygglog_error("comm_recv(%s): Failed to receive header or message.",
       x->name);
   }
   return ret;

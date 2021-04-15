@@ -1,0 +1,8 @@
+---
+
+model:
+  name: server
+  language: matlab
+  args: ./src/server.m
+  function: server  # matlab requires function to match file
+  is_server: True  # Creates a RPC server queue called "server"
