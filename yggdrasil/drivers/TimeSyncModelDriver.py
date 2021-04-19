@@ -180,7 +180,8 @@ class TimeSyncModelDriver(DSLModelDriver):
                 continue
             t, state = values[:]
             t_pd = units.convert_to_pandas_timedelta(t)
-            client_model = rpc.ocomm[request_id].client_model
+            client_model = rpc.ocomm[
+                rpc.requests[request_id].response_address].client_model
             # Remove variables marked as external so they are not merged
             external_variables = additional_variables.get(client_model, [])
             for k in external_variables:
