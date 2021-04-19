@@ -1489,8 +1489,8 @@ size_t nargs_exp_dtype(const dtype_t *dtype);
 
 
 #define free_generic destroy_generic
-#define init_json_object init_generic
-#define init_json_array init_generic
+#define init_json_object init_generic_map
+#define init_json_array init_generic_array
 #define init_schema init_generic
 #define free_json_object free_generic
 #define free_json_array free_generic
