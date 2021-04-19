@@ -229,7 +229,7 @@ class ServerComm(CommBase.CommBase):
         else:
             comm_kwargs['is_response_server'] = True
         response_id = header['request_id']
-        while response_id in self.ocomm:  # pragma: debug
+        while response_id in self.requests:  # pragma: debug
             response_id += str(uuid.uuid4())
         header['response_id'] = response_id
         if header['response_address'] not in self.ocomm:
