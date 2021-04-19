@@ -436,7 +436,9 @@ def cfg_logging(cfg=None):
     to_stdout = (is_model or in_notebook)
     if cfg is None:
         cfg = ygg_cfg
-    _LOG_FORMAT = "%(levelname)s:%(module)s.%(funcName)s[%(lineno)d]:%(message)s"
+    log_format = cfg.get(
+        'debug', 'format',
+        "%(levelname)s:%(module)s.%(funcName)s[%(lineno)d]:%(message)s")
     logLevelYGG = eval(
         'logging.%s' % os.environ.get(
             'YGG_DEBUG', cfg.get('debug', 'ygg', 'NOTSET')))
@@ -449,7 +451,7 @@ def cfg_logging(cfg=None):
     if is_model:
         logLevelYGG = os.environ.get('YGG_MODEL_DEBUG', logLevelCLI)
     if not to_stdout:
-        logging.basicConfig(format=_LOG_FORMAT)
+        logging.basicConfig(format=log_format)
     ygg_logger = logging.getLogger("yggdrasil")
     rmq_logger = logging.getLogger("pika")
     ygg_logger.setLevel(level=logLevelYGG)
@@ -457,7 +459,7 @@ def cfg_logging(cfg=None):
     # For models, route the logs to stdout so that they are
     # displayed by the model driver.
     if to_stdout:
-        formatter = logging.Formatter(fmt=_LOG_FORMAT)
+        formatter = logging.Formatter(fmt=log_format)
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(formatter)
         handler.setLevel(logLevelYGG)
