@@ -371,6 +371,7 @@ class ygginfo(SubCommand):
         from yggdrasil import tools, config, __version__
         lang_list = tools.get_installed_lang()
         comm_list = tools.get_installed_comm()
+        comm_lang_list = []
         prefix = '    '
         curr_prefix = ''
         vardict = [
@@ -391,11 +392,11 @@ class ygginfo(SubCommand):
                     drv = import_component('model', lang)
                     vardict.append(
                         (curr_prefix + '%s:' % lang.upper(), ''))
+                    if not drv.comms_implicit:
+                        comm_lang_list.append(lang)
                     curr_prefix += prefix
-                    if lang == 'executable':
-                        vardict.append((curr_prefix + 'Location', ''))
-                    else:
-                        exec_name = drv.language_executable()
+                    exec_name = drv.language_executable()
+                    if exec_name:
                         if not os.path.isabs(exec_name):
                             exec_name = shutil.which(exec_name)
                         vardict.append((curr_prefix + 'Location',
@@ -480,15 +481,15 @@ class ygginfo(SubCommand):
                         (curr_prefix + '%s:' % comm.upper(), ''))
                     curr_prefix += prefix
                     avail = [cmm.is_installed(language=lang)
-                             for lang in lang_list]
+                             for lang in comm_lang_list]
                     vardict.append(
                         (curr_prefix + "Available for ",
-                         sorted([lang_list[i].upper()
+                         sorted([comm_lang_list[i].upper()
                                  for i in range(len(avail))
                                  if avail[i]])))
                     vardict.append(
                         (curr_prefix + "Not Available for ",
-                         sorted([lang_list[i].upper()
+                         sorted([comm_lang_list[i].upper()
                                  for i in range(len(avail))
                                  if not avail[i]])))
                     curr_prefix = curr_prefix.rsplit(prefix, 1)[0]

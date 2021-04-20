@@ -134,8 +134,8 @@ definitions:
             type: string
           type: array
       required:
-      - name
       - datatype
+      - name
       - commtype
       title: comm_base
       type: object
@@ -609,8 +609,8 @@ definitions:
           type: string
       required:
       - name
-      - filetype
       - working_dir
+      - filetype
       title: file_base
       type: object
     - anyOf:
@@ -1367,6 +1367,7 @@ definitions:
           - lpy
           - make
           - matlab
+          - mpi
           - osr
           - python
           - r
@@ -1686,9 +1687,9 @@ definitions:
           type: string
       required:
       - name
+      - working_dir
       - language
       - args
-      - working_dir
       title: model_base
       type: object
     - anyOf:
@@ -1836,6 +1837,18 @@ definitions:
               type: string
             type: array
         title: MakeModelDriver
+        type: object
+      - additionalProperties: true
+        description: Schema for model component ['mpi'] subtype.
+        properties:
+          language:
+            default: executable
+            description: Model is being run on another MPI process and this driver
+              is used as as stand-in to monitor it on the root process.
+            enum:
+            - mpi
+            type: string
+        title: MPIPartnerModel
         type: object
       - additionalProperties: true
         description: Schema for model component ['python'] subtype.

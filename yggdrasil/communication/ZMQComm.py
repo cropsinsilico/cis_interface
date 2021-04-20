@@ -98,7 +98,13 @@ def format_address(protocol, host, port=None):
 
     """
     if host == 'localhost':
-        host = '127.0.0.1'
+        if multitasking._on_mpi:
+            assert(protocol not in ['inproc', 'ipc'])
+            # TODO: Get address
+            logger.error("TODO: Get full address from config")
+            host = '127.0.0.1'
+        else:
+            host = '127.0.0.1'
     if protocol in ['inproc', 'ipc']:
         address = "%s://%s" % (protocol, host)
     elif protocol not in _socket_protocols:
