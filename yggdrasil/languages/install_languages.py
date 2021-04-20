@@ -90,7 +90,11 @@ def import_language_install(language, no_import=False):
     if not is_file(os.path.join(lang_dir, language, 'install.py')):
         if not (no_import or is_dir(os.path.join(lang_dir, language))):
             from yggdrasil.languages import get_language_dir
-            fname = os.path.basename(get_language_dir(language))
+            try:
+                fname = os.path.basename(get_language_dir(language))
+            except ValueError:
+                yield None
+                return
             with import_language_install(fname, no_import=True) as install:
                 yield install
         else:
