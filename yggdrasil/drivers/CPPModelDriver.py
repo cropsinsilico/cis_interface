@@ -17,6 +17,23 @@ class CPPCompilerBase(CCompilerBase):
     default_executable = None
 
     @classmethod
+    def add_standard_flag(cls, flags):
+        r"""Add a standard flag to the list of flags.
+
+        Args:
+            flags (list): Compilation flags.
+
+        """
+        std_flag = None
+        for i, a in enumerate(flags):
+            if a.startswith('-std='):
+                std_flag = i
+                break
+        if std_flag is None:
+            flags.append('-std=%s' % cls.cpp_std)
+        return flags
+
+    @classmethod
     def get_flags(cls, skip_standard_flag=False, **kwargs):
         r"""Get a list of compiler flags.
 
@@ -33,13 +50,7 @@ class CPPCompilerBase(CCompilerBase):
         out = super(CCompilerBase, cls).get_flags(**kwargs)
         # Add standard library flag
         if not skip_standard_flag:
-            std_flag = None
-            for i, a in enumerate(out):
-                if a.startswith('-std='):
-                    std_flag = i
-                    break
-            if std_flag is None:
-                out.append('-std=%s' % cls.cpp_std)
+            out = cls.add_standard_flag(out)
         return out
     
 
@@ -67,6 +78,26 @@ class ClangPPCompiler(CPPCompilerBase, ClangCompiler):
             cls.default_executable = 'clang'
         CPPCompilerBase.before_registration(cls)
 
+    @classmethod
+    def get_flags(cls, skip_standard_flag=False, **kwargs):
+        r"""Get a list of compiler flags.
+
+        Args:
+            skip_standard_flag (bool, optional): If True, the C++ standard flag
+                will not be added. Defaults to False.
+            **kwargs: Additional keyword arguments are passed to the parent
+                class's method.
+
+        Returns:
+            list: Compiler flags.
+
+        """
+        out = super(ClangCompiler, cls).get_flags(**kwargs)
+        # Add standard library flag
+        if not skip_standard_flag:
+            out = cls.add_standard_flag(out)
+        return out
+        
     @classmethod
     def get_executable_command(cls, args, skip_flags=False, unused_kwargs=None,
                                **kwargs):
@@ -113,6 +144,9 @@ class MSVCPPCompiler(CPPCompilerBase, MSVCCompiler):
             list: Compiler flags.
 
         """
+        # NOTE: If a get_flags method is added to MSVCCompiler, it should
+        # be called directly (no need to call CPPCompilerBase since it
+        # just adds the standard flag)
         kwargs['skip_standard_flag'] = True
         return super(MSVCPPCompiler, cls).get_flags(**kwargs)
 
