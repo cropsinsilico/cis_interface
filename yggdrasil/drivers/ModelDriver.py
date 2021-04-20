@@ -215,6 +215,11 @@ class ModelDriver(Driver):
         brackets (tuple): A pair of opening and clossing characters that
             are used by the language to mark blocks. Set to None and
             ignored by default.
+        no_executable (bool): True if there is not an executable associated
+            with the language driver. Defaults to False.
+        comms_implicit (bool): True if the comms installed for this driver
+            are not explicitly defined (depend on input parameters). Defaults
+            to False.
 
     Attributes:
         args (list): Argument(s) for running the model on the command line.
@@ -394,6 +399,8 @@ class ModelDriver(Driver):
     brackets = None
     zero_based = True
     max_line_width = None
+    no_executable = False
+    comms_implicit = False
     python_interface = {'table_input': 'YggAsciiTableInput',
                         'table_output': 'YggAsciiTableOutput',
                         'array_input': 'YggArrayInput',
@@ -691,6 +698,8 @@ class ModelDriver(Driver):
                 to run the compiler/interpreter from the command line.
 
         """
+        if cls.no_executable:
+            return ''
         raise NotImplementedError("language_executable not implemented for '%s'"
                                   % cls.language)
         
@@ -1049,6 +1058,8 @@ class ModelDriver(Driver):
                 out = import_component('model', x).is_comm_installed(
                     commtype=commtype, skip_config=skip_config, **kwargs)
             return out
+        if cls.comms_implicit:
+            return True
         # Check for installation based on config option
         if not skip_config:
             installed_comms = cls.cfg.get(cls.language, 'commtypes', [])
@@ -1196,6 +1207,8 @@ class ModelDriver(Driver):
         existing.update(copy.deepcopy(self.env))
         env = self.set_env_class(existing=existing, **kwargs)
         env['YGG_SUBPROCESS'] = "True"
+        if multitasking._on_mpi:
+            env['YGG_ON_MPI'] = '1'
         env['YGG_MODEL_INDEX'] = str(self.model_index)
         env['YGG_MODEL_LANGUAGE'] = self.language
         if self.copies > 1:
@@ -1237,6 +1250,11 @@ class ModelDriver(Driver):
                 target=self.enqueue_output_loop,
                 name=self.name + '.EnqueueLoop')
             self.queue_thread.start()
+        self._mpi_comm = False
+        self._mpi_requests = {}
+        if multitasking._on_mpi:
+            self._mpi_comm = multitasking.MPI.COMM_WORLD
+            self.init_mpi()
 
     def queue_close(self):
         r"""Close the queue for messages from the model process."""
@@ -1253,7 +1271,7 @@ class ModelDriver(Driver):
         except BaseException as e:  # pragma: debug
             print(e)
             line = ""
-        if len(line) == 0:
+        if (len(line) == 0):
             # self.info("%s: Empty line from stdout" % self.name)
             self.queue_thread.set_break_flag()
             try:
@@ -1277,6 +1295,53 @@ class ModelDriver(Driver):
                    self.model_command(), os.getcwd(), self.working_dir,
                    pformat(self.env))
 
+    def init_mpi(self):
+        r"""Initialize MPI communicator."""
+        if self._mpi_comm.Get_rank() == 0:
+            self._mpi_comm = None
+        else:
+            self._mpi_comm.recv(source=0, tag=1)
+            self._mpi_requests['stopped'] = {
+                'request': self._mpi_comm.irecv(source=0, tag=3)}
+
+    def stop_mpi_partner(self, msg=None, dest=0, tag=2):
+        r"""Send a message to stop the MPI partner model on the main process."""
+        if self._mpi_comm and (not self.check_mpi_request('stopping')):
+            if msg is None:
+                if self.errors:
+                    msg = 'ERROR'
+                else:
+                    msg = 'STOPPING'
+            self._mpi_requests['stopping'] = {
+                'result': True,  # Don't call test()
+                'request': self._mpi_comm.isend(msg, dest=dest, tag=tag)}
+
+    def check_mpi_request(self, name):
+        r"""Check if a request has been completed.
+
+        Args:
+            name (str): Name that request was registered under.
+
+        Returns:
+            bool, str: Received message or False if the request does not
+                exist or is not complete.
+
+        """
+        if self._mpi_comm and (name in self._mpi_requests):
+            if 'result' not in self._mpi_requests[name]:
+                result = self._mpi_requests[name]['request'].test()
+                if result[0]:
+                    self._mpi_requests[name]['result'] = result[1]
+                    if result[1] == 'ERROR':
+                        self.errors.append(result[1])
+            return self._mpi_requests[name].get('result', False)
+        return False
+
+    def set_break_flag(self, *args, **kwargs):
+        r"""Stop the model loop."""
+        self.stop_mpi_partner()
+        super(ModelDriver, self).set_break_flag(*args, **kwargs)
+
     def run_loop(self):
         r"""Loop to check if model is still running and forward output."""
         # Continue reading until there is not any output
@@ -1290,7 +1355,7 @@ class ModelDriver(Driver):
             self.error("Queue disconnected")
             self.set_break_flag()
         else:
-            if (line == self._exit_line):
+            if (line == self._exit_line) or self.check_mpi_request('stopped'):
                 self.debug("No more output")
                 self.set_break_flag()
             else:
@@ -1301,6 +1366,7 @@ class ModelDriver(Driver):
         r"""Actions to perform after run_loop has finished. Mainly checking
         if there was an error and then handling it."""
         self.debug('')
+        self.stop_mpi_partner()
         if self.queue_thread is not None:
             self.queue_thread.join(self.sleeptime)
             if self.queue_thread.is_alive():

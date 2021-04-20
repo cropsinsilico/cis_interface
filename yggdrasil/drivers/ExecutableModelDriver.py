@@ -19,6 +19,8 @@ class ExecutableModelDriver(ModelDriver):
     _schema_subtype_description = ('Model is an executable.')
     full_language = False
     executable_type = 'other'
+    no_executable = True
+    comms_implicit = True
 
     @staticmethod
     def before_registration(cls):

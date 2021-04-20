@@ -15,6 +15,8 @@ class FunctionModelDriver(InterpretedModelDriver):
     full_language = False
     base_languages = ['python']
     language_ext = []
+    no_executable = True
+    comms_implicit = True
 
     @classmethod
     def is_language_installed(self):

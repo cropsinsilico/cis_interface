@@ -33,7 +33,7 @@ LANGUAGES = {
     'dsl': [
         'lpy', 'osr', 'sbml'],
     'other': [
-        'executable', 'function', 'timesync'],
+        'executable', 'function', 'mpi', 'timesync'],
 }
 LANGUAGES['all'] = (
     LANGUAGES['compiled']
@@ -51,7 +51,7 @@ LANGUAGES_WITH_ALIASES = {
     'dsl': [
         'lpy', 'osr', 'sbml'],
     'other': [
-        'executable', 'function', 'timesync'],
+        'executable', 'function', 'mpi', 'timesync'],
 }
 LANGUAGES_WITH_ALIASES['all'] = (
     LANGUAGES_WITH_ALIASES['compiled']

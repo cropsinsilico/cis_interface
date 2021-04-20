@@ -2,6 +2,7 @@
 import sys
 import os
 import time
+import copy
 import signal
 import traceback
 import atexit
@@ -12,6 +13,7 @@ from yggdrasil.tools import YggClass
 from yggdrasil.config import ygg_cfg, cfg_environment, temp_config
 from yggdrasil import platform, yamlfile
 from yggdrasil.drivers import create_driver, DuplicatedModelDriver
+from yggdrasil.multitasking import MPI
 
 
 COLOR_TRACE = '\033[30;43;22m'
@@ -194,7 +196,15 @@ class YggRunner(YggClass):
                  ygg_debug_level=None, rmq_debug_level=None,
                  ygg_debug_prefix=None, connection_task_method='thread',
                  as_function=False, production_run=False):
-        super(YggRunner, self).__init__('runner')
+        self.mpi_comm = None
+        name = 'runner'
+        if MPI is not None:
+            comm = MPI.COMM_WORLD
+            if comm.Get_size() > 1:
+                self.mpi_comm = comm
+                rank = comm.Get_rank()
+                name += str(rank)
+        super(YggRunner, self).__init__(name)
         if namespace is None:
             namespace = ygg_cfg.get('rmq', 'namespace', False)
         if not namespace:  # pragma: debug
@@ -215,9 +225,12 @@ class YggRunner(YggClass):
         # Update environment based on config
         cfg_environment()
         # Parse yamls
-        self.drivers = yamlfile.parse_yaml(modelYmls, as_function=as_function)
-        self.connectiondrivers = self.drivers['connection']
-        self.modeldrivers = self.drivers['model']
+        if self.mpi_comm and (self.rank > 0):
+            pass
+        else:
+            self.drivers = yamlfile.parse_yaml(modelYmls, as_function=as_function)
+            self.connectiondrivers = self.drivers['connection']
+            self.modeldrivers = self.drivers['model']
 
     def pprint(self, *args):
         r"""Print with color."""
@@ -422,6 +435,35 @@ class YggRunner(YggClass):
             self.debug("Loading connection drivers")
             for driver in self.connectiondrivers.values():
                 self.create_connection_driver(driver)
+            # Distribute tasks
+            if self.mpi_comm:
+                if self.rank == 0:
+                    self.all_modeldrivers = self.modeldrivers
+                    size = self.mpi_comm.Get_size()
+                    models = [[] for _ in range(size)]
+                    for i, (k, v) in enumerate(self.modeldrivers.items()):
+                        x_cp = copy.deepcopy(v)
+                        for k2 in ['input_drivers', 'output_drivers']:
+                            x_cp.pop(k2, None)
+                        # Skew models away from root process so that
+                        # connection threading might not share process
+                        models[(i) % size].append((k, x_cp))
+                    max_len = len(max(models, key=len))
+                    for x in models:
+                        while len(x) < max_len:
+                            x.append(None)
+                else:
+                    models = None
+                self.modeldrivers = dict(
+                    [x for x in self.mpi_comm.scatter(models, root=0)
+                     if (x is not None)])
+                if self.rank == 0:
+                    for i, (k, v) in enumerate(self.all_modeldrivers.items()):
+                        if k not in self.modeldrivers:
+                            v['language'] = 'mpi'
+                            v['driver'] = 'MPIPartnerModel'
+                            v['mpi_rank'] = i
+                        self.modeldrivers[k] = v
             # Create model drivers
             self.debug("Loading model drivers")
             for driver in self.modeldrivers.values():
@@ -455,7 +497,10 @@ class YggRunner(YggClass):
             for driver in self.modeldrivers.values():
                 self.debug("Starting driver %s", driver['name'])
                 d = driver['instance']
+                # TODO: Need way to start client remotely
                 for n2 in driver.get('client_of', []):
+                    if self.mpi_comm:
+                        raise NotImplementedError("Start client remotely")
                     d2 = self.modeldrivers[n2]['instance']
                     if not d2.was_started:
                         self.debug("Starting server '%s' before client", d2.name)

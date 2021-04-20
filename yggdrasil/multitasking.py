@@ -8,6 +8,16 @@ import threading
 import queue
 import multiprocessing
 from yggdrasil.tools import YggClass
+MPI = None
+_on_mpi = False
+if os.environ.get('YGG_SUBPROCESS', False):
+    _on_mpi = (os.environ.get('YGG_ON_MPI', '0') == '1')
+else:
+    try:
+        from mpi4py import MPI
+        _on_mpi = (MPI.COMM_WORLD.Get_size() > 1)
+    except ImportError:
+        pass
 
 
 mp_ctx = multiprocessing.get_context()
