@@ -33,6 +33,12 @@ class CPPCompilerBase(CCompilerBase):
             flags.append('-std=%s' % cls.cpp_std)
         return flags
 
+
+class GPPCompiler(CPPCompilerBase, GCCCompiler):
+    r"""Interface class for G++ compiler/linker."""
+    toolname = 'g++'
+    aliases = ['gnu-c++']
+
     @classmethod
     def get_flags(cls, skip_standard_flag=False, **kwargs):
         r"""Get a list of compiler flags.
@@ -47,17 +53,11 @@ class CPPCompilerBase(CCompilerBase):
             list: Compiler flags.
 
         """
-        out = super(CCompilerBase, cls).get_flags(**kwargs)
+        out = super(GPPCompiler, cls).get_flags(**kwargs)
         # Add standard library flag
         if not skip_standard_flag:
             out = cls.add_standard_flag(out)
         return out
-    
-
-class GPPCompiler(CPPCompilerBase, GCCCompiler):
-    r"""Interface class for G++ compiler/linker."""
-    toolname = 'g++'
-    aliases = ['gnu-c++']
 
 
 class ClangPPCompiler(CPPCompilerBase, ClangCompiler):
@@ -92,7 +92,7 @@ class ClangPPCompiler(CPPCompilerBase, ClangCompiler):
             list: Compiler flags.
 
         """
-        out = super(ClangCompiler, cls).get_flags(**kwargs)
+        out = super(ClangPPCompiler, cls).get_flags(**kwargs)
         # Add standard library flag
         if not skip_standard_flag:
             out = cls.add_standard_flag(out)
@@ -132,24 +132,6 @@ class MSVCPPCompiler(CPPCompilerBase, MSVCCompiler):
     search_path_flags = None
     dont_create_linker = True
     
-    @classmethod
-    def get_flags(cls, **kwargs):
-        r"""Get a list of compiler flags.
-
-        Args:
-            **kwargs: Additional keyword arguments are passed to the parent
-                class's method.
-
-        Returns:
-            list: Compiler flags.
-
-        """
-        # NOTE: If a get_flags method is added to MSVCCompiler, it should
-        # be called directly (no need to call CPPCompilerBase since it
-        # just adds the standard flag)
-        kwargs['skip_standard_flag'] = True
-        return super(MSVCPPCompiler, cls).get_flags(**kwargs)
-
     @staticmethod
     def before_registration(cls):
         r"""Operations that should be performed to modify class attributes prior
