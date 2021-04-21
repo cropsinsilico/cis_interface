@@ -392,7 +392,8 @@ class ConnectionDriver(Driver):
 
     @state.setter
     def state(self, x):
-        self.shared['state'] = x
+        if hasattr(self, 'shared'):
+            self.shared['state'] = x
 
     @property
     def close_state(self):

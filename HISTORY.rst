@@ -13,7 +13,9 @@ X.X.X (XXXX-XX-XX)
 * Added C, C++, Fortran, Matlab, R versions of server in rpc_lesson3b example (still need R, Python, Matlab versions of the threaded client)
 * Added C versions of rpc_lesson3b example
 * Fix bug in yggdevup CLI
+* Enhance debug information w/ task status
 * Allow models to be run on distributed processes via MPI (WIP)
+
 
 1.6.0 (2021-04-14) Single connection, async refactor, threading, & model copies
 ------------------

@@ -335,7 +335,7 @@ class ExampleTstBase(YggTestBase, tools.YggClass):
         if self.iter_param.get('mpi', False):
             try:
                 nproc = 2
-                args = ['mpirun', '-n', str(nproc), 'yggrun']
+                args = ['mpiexec', '-n', str(nproc), 'yggrun']
                 if isinstance(self.yaml, str):
                     args.append(self.yaml)
                 else:
