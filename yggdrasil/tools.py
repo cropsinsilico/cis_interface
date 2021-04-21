@@ -1549,8 +1549,7 @@ class YggClass(ComponentBase):
 
     def printStatus(self):
         r"""Print the class status."""
-        self.logger.info('%s(%s): state: %s', self.__module__,
-                         self.print_name, self.state)
+        self.logger.info('%s(%s): ', self.__module__, self.print_name)
 
     def _task_with_output(self, func, *args, **kwargs):
         self.sched_out = func(*args, **kwargs)
