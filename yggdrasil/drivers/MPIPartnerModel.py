@@ -18,6 +18,7 @@ class MPIPartnerModel(ModelDriver):
     comms_implicit = True
 
     def __init__(self, *args, **kwargs):
+        kwargs.pop('function', None)
         self.mpi_rank = kwargs.pop('mpi_rank')
         super(MPIPartnerModel, self).__init__(*args, **kwargs)
 

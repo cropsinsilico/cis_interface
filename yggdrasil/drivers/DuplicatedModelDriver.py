@@ -23,22 +23,30 @@ class DuplicatedModelDriver(Driver):
     name_format = "%s_copy%d"
 
     def __init__(self, yml, **kwargs):
-        env_copy_specific = {}
-        for i in range(yml['copies']):
-            iname = self.name_format % (yml['name'], i)
-            env_copy_specific[iname] = yml.pop('env_%s' % iname, {})
         kwargs.update(yml)
         self.copies = []
-        for i in range(yml['copies']):
+        for iyml in self.get_yaml_copies(yml):
             ikws = copy.deepcopy(kwargs)
-            iyml = copy.deepcopy(yml)
-            iyml['name'] = self.name_format % (yml['name'], i)
-            # Update environment to reflect addition of suffix
-            iyml['env'] = yml['env'].copy()
-            iyml['env'].update(env_copy_specific.get(iyml['name'], {}))
             ikws.update(iyml)
             self.copies.append(create_driver(yml=iyml, **ikws))
         super(DuplicatedModelDriver, self).__init__(**kwargs)
+
+    @classmethod
+    def get_yaml_copies(cls, yml):
+        env_copy_specific = {}
+        for i in range(yml['copies']):
+            iname = cls.name_format % (yml['name'], i)
+            env_copy_specific[iname] = yml.pop('env_%s' % iname, {})
+        copies = []
+        for i in range(yml['copies']):
+            iyml = copy.deepcopy(yml)
+            iyml['name'] = cls.name_format % (yml['name'], i)
+            iyml['copy_index'] = i
+            # Update environment to reflect addition of suffix
+            iyml['env'] = yml['env'].copy()
+            iyml['env'].update(env_copy_specific.get(iyml['name'], {}))
+            copies.append(iyml)
+        return copies
 
     def cleanup(self, *args, **kwargs):
         r"""Actions to perform to clean up the thread after it has stopped."""

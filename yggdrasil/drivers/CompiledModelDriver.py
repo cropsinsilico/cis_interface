@@ -3633,7 +3633,8 @@ class CompiledModelDriver(ModelDriver):
                               working_dir=self.working_dir,
                               products=self.products,
                               toolname=self.get_tool_instance('compiler',
-                                                              return_prop='name'))
+                                                              return_prop='name'),
+                              suffix=('_%s' % self.name))
         if not kwargs.get('dont_link', False):
             default_kwargs.update(linker_flags=self.linker_flags)
         for k, v in default_kwargs.items():
@@ -3753,7 +3754,8 @@ class CompiledModelDriver(ModelDriver):
                         commtype=kwargs.get('commtype', None), toolname=toolname))
                 if (kwargs['libtype'] == 'static') and ('linker_language' in kwargs):
                     kwargs['archiver_language'] = kwargs.pop('linker_language')
-            kwargs['suffix'] = cls.get_internal_suffix(
+            kwargs.setdefault('suffix', '')
+            kwargs['suffix'] += cls.get_internal_suffix(
                 commtype=kwargs.get('commtype', None))
             return cls.call_compiler(src, toolname=toolname, **kwargs)
         # Compile using the compiler after updating the flags
