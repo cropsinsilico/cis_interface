@@ -92,7 +92,7 @@ def import_language_install(language, no_import=False):
             from yggdrasil.languages import get_language_dir
             try:
                 fname = os.path.basename(get_language_dir(language))
-            except ValueError:
+            except ValueError:  # pragma: debug
                 yield None
                 return
             with import_language_install(fname, no_import=True) as install:

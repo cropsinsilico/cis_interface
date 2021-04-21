@@ -63,7 +63,6 @@ class ServerComm(CommBase.CommBase):
         self.response_kwargs.setdefault('recv_timeout', self.icomm.recv_timeout)
         self.response_kwargs.setdefault('language', self.icomm.language)
         self.response_kwargs.setdefault('use_async', self.icomm.is_async)
-        self._used_response_comms = dict()
         self.clients = []
         self.closed_clients = []
         self.nclients_expected = int(os.environ.get('YGG_NCLIENTS', 0))
@@ -177,8 +176,6 @@ class ServerComm(CommBase.CommBase):
         r"""Close the connection."""
         self.icomm.close(*args, **kwargs)
         for ocomm in self.ocomm.values():
-            ocomm.close()
-        for ocomm in self._used_response_comms.values():
             ocomm.close()
         super(ServerComm, self).close(*args, **kwargs)
 
