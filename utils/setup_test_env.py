@@ -216,6 +216,7 @@ def get_install_opts(old=None):
             'trimesh': (os.environ.get('INSTALLTRIMESH', '0') == '1'),
             'pygments': (os.environ.get('INSTALLPYGMENTS', '0') == '1'),
             'omp': (os.environ.get('INSTALLOMP', '0') == '1'),
+            'mpi': (os.environ.get('INSTALLMPI', '0') == '1'),
         }
         if not _is_win:
             new['c'] = True  # c compiler usually installed by default
@@ -232,6 +233,7 @@ def get_install_opts(old=None):
             'trimesh': True,
             'pygments': True,
             'omp': False,
+            'mpi': False,
         }
     if _is_win:
         new['os'] = 'win'
@@ -573,6 +575,13 @@ def itemize_deps(method, for_development=False,
             out['os'].append('libomp-dev')
         elif install_opts['os'] == 'osx':
             out['os'] += ['libomp', 'llvm']
+        elif install_opts['os'] == 'win':
+            pass
+    if install_opts['mpi'] and (not fallback_to_conda):
+        if install_opts['os'] == 'linux':
+            out['os'] += ['openmpi-bin', 'libopenmpi-dev']
+        elif install_opts['os'] == 'osx':
+            out['os'].append('open-mpi')
         elif install_opts['os'] == 'win':
             pass
     if install_opts['fortran'] and (not fallback_to_conda):
