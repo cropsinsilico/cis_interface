@@ -228,12 +228,20 @@ jobs:
         '
     - name: Run tests (1st)
       id: test1
-      run: yggtest --ci --cov-append ${{ matrix.test-flags1 }}
+      run: 'mpiexec -n 2 yggrun yggdrasil/examples/gs_lesson4/gs_lesson4_cpp.yml
+
+        yggtest --ci --cov-append ${{ matrix.test-flags1 }}
+
+        '
       continue-on-error: true
     - name: Re-run test failures (1st)
       if: ${{ steps.test1.outcome == 'failure' }}
-      run: yggtest --ci --cov-append ${{ matrix.test-flags1 }} --last-failed --last-failed-no-failures=none
+      run: 'mpiexec -n 2 yggrun yggdrasil/examples/gs_lesson4/gs_lesson4_cpp.yml
+
+        yggtest --ci --cov-append ${{ matrix.test-flags1 }} --last-failed --last-failed-no-failures=none
         --debug
+
+        '
     - name: Run tests (2nd)
       if: matrix.test-flags2 != ''
       id: test2
@@ -494,12 +502,20 @@ jobs:
         '
     - name: Run tests (1st)
       id: test1
-      run: yggtest --ci --cov-append ${{ matrix.test-flags1 }}
+      run: 'mpiexec -n 2 yggrun yggdrasil/examples/gs_lesson4/gs_lesson4_cpp.yml
+
+        yggtest --ci --cov-append ${{ matrix.test-flags1 }}
+
+        '
       continue-on-error: true
     - name: Re-run test failures (1st)
       if: ${{ steps.test1.outcome == 'failure' }}
-      run: yggtest --ci --cov-append ${{ matrix.test-flags1 }} --last-failed --last-failed-no-failures=none
+      run: 'mpiexec -n 2 yggrun yggdrasil/examples/gs_lesson4/gs_lesson4_cpp.yml
+
+        yggtest --ci --cov-append ${{ matrix.test-flags1 }} --last-failed --last-failed-no-failures=none
         --debug
+
+        '
     - name: Run tests (2nd)
       if: matrix.test-flags2 != ''
       id: test2
@@ -740,12 +756,20 @@ jobs:
         '
     - name: Run tests (1st)
       id: test1
-      run: yggtest --ci --cov-append ${{ matrix.test-flags1 }}
+      run: 'mpiexec -n 2 yggrun yggdrasil/examples/gs_lesson4/gs_lesson4_cpp.yml
+
+        yggtest --ci --cov-append ${{ matrix.test-flags1 }}
+
+        '
       continue-on-error: true
     - name: Re-run test failures (1st)
       if: ${{ steps.test1.outcome == 'failure' }}
-      run: yggtest --ci --cov-append ${{ matrix.test-flags1 }} --last-failed --last-failed-no-failures=none
+      run: 'mpiexec -n 2 yggrun yggdrasil/examples/gs_lesson4/gs_lesson4_cpp.yml
+
+        yggtest --ci --cov-append ${{ matrix.test-flags1 }} --last-failed --last-failed-no-failures=none
         --debug
+
+        '
     - name: Run tests (2nd)
       if: matrix.test-flags2 != ''
       id: test2
@@ -988,12 +1012,20 @@ jobs:
         '
     - name: Run tests (1st)
       id: test1
-      run: yggtest --ci --cov-append ${{ matrix.test-flags1 }}
+      run: 'mpiexec -n 2 yggrun yggdrasil/examples/gs_lesson4/gs_lesson4_cpp.yml
+
+        yggtest --ci --cov-append ${{ matrix.test-flags1 }}
+
+        '
       continue-on-error: true
     - name: Re-run test failures (1st)
       if: ${{ steps.test1.outcome == 'failure' }}
-      run: yggtest --ci --cov-append ${{ matrix.test-flags1 }} --last-failed --last-failed-no-failures=none
+      run: 'mpiexec -n 2 yggrun yggdrasil/examples/gs_lesson4/gs_lesson4_cpp.yml
+
+        yggtest --ci --cov-append ${{ matrix.test-flags1 }} --last-failed --last-failed-no-failures=none
         --debug
+
+        '
     - name: Run tests (2nd)
       if: matrix.test-flags2 != ''
       id: test2
@@ -1234,12 +1266,20 @@ jobs:
         '
     - name: Run tests (1st)
       id: test1
-      run: yggtest --ci --cov-append ${{ matrix.test-flags1 }}
+      run: 'mpiexec -n 2 yggrun yggdrasil/examples/gs_lesson4/gs_lesson4_cpp.yml
+
+        yggtest --ci --cov-append ${{ matrix.test-flags1 }}
+
+        '
       continue-on-error: true
     - name: Re-run test failures (1st)
       if: ${{ steps.test1.outcome == 'failure' }}
-      run: yggtest --ci --cov-append ${{ matrix.test-flags1 }} --last-failed --last-failed-no-failures=none
+      run: 'mpiexec -n 2 yggrun yggdrasil/examples/gs_lesson4/gs_lesson4_cpp.yml
+
+        yggtest --ci --cov-append ${{ matrix.test-flags1 }} --last-failed --last-failed-no-failures=none
         --debug
+
+        '
     - name: Run tests (2nd)
       if: matrix.test-flags2 != ''
       id: test2

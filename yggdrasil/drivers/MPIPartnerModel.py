@@ -86,7 +86,7 @@ class MPIPartnerModel(ModelDriver):
                 to run the compiler/interpreter from the command line.
 
         """
-        return shutil.which('mpirun')
+        return shutil.which('mpiexec')
         
     def run_model(self, **kwargs):
         r"""Dummy stand-in for ModelDriver run_model method."""

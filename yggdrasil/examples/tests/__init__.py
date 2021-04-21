@@ -341,9 +341,10 @@ class ExampleTstBase(YggTestBase, tools.YggClass):
                 else:
                     args += self.yaml
                 args += ['--namespace=%s' % self.namespace, '--production-run']
-                subprocess.check_call(args)
+                print(subprocess.check_output(args).decode('utf-8'))
                 assert(not self.expects_error)
-            except subprocess.CalledProcessError:
+            except subprocess.CalledProcessError as e:
+                print(e.output.decode('utf-8'))
                 if not self.expects_error:
                     raise
         else:
