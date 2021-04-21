@@ -268,7 +268,7 @@ class ClientComm(CommBase.CommBase):
         while self.responses.get(self.request_order[0], None) is None:
             msg = self.icomm.recv_message(*args, **kwargs)
             self.errors += self.icomm.errors
-            if msg != CommBase.FLAG_SUCCESS:
+            if msg.flag != CommBase.FLAG_SUCCESS:
                 break
             assert(msg.header['request_id'] not in self.responses)
             self.responses[msg.header['request_id']] = msg
