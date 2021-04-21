@@ -8,7 +8,7 @@ from yggdrasil import tools, languages, serialize, constants
 # TODO: This can be generated from the drivers
 ext_map = dict(constants.LANG2EXT, executable='',
                make='.cpp', cmake='.cpp', function='',
-               osr='.xml', sbml='.xml')
+               osr='.xml', sbml='.xml', mpi='')
 for lang in tools.get_supported_lang():
     if lang.lower() not in ext_map:
         ext_map[lang.lower()] = languages.get_language_ext(lang)

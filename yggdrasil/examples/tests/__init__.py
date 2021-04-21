@@ -6,6 +6,7 @@ import tempfile
 import shutil
 import itertools
 import flaky
+import subprocess
 from yggdrasil.components import ComponentMeta, import_component
 from yggdrasil import runner, tools, platform
 from yggdrasil.examples import (
@@ -331,17 +332,33 @@ class ExampleTstBase(YggTestBase, tools.YggClass):
                 ipcrm_queues()
         # Run
         os.environ.update(self.env)
-        self.runner = runner.get_runner(self.yaml, namespace=self.namespace,
-                                        production_run=True)
-        self.runner.run()
-        if self.expects_error:
-            assert(self.runner.error_flag)
+        if self.iter_param.get('mpi', False):
+            try:
+                nproc = 2
+                args = ['mpirun', '-n', str(nproc), 'yggrun']
+                if isinstance(self.yaml, str):
+                    args.append(self.yaml)
+                else:
+                    args += self.yaml
+                args += ['--namespace=%s' % self.namespace, '--production-run']
+                subprocess.check_call(args)
+                assert(not self.expects_error)
+            except subprocess.CalledProcessError:
+                if not self.expects_error:
+                    raise
         else:
-            assert(not self.runner.error_flag)
+            self.runner = runner.get_runner(self.yaml, namespace=self.namespace,
+                                            production_run=True)
+            self.runner.run()
+            if self.expects_error:
+                assert(self.runner.error_flag)
+            else:
+                assert(not self.runner.error_flag)
         try:
             self.check_results()
         except BaseException:  # pragma: debug
-            self.runner.printStatus()
+            if self.runner is not None:
+                self.runner.printStatus()
             raise
         finally:
             self.example_cleanup()
@@ -377,6 +394,15 @@ class ExampleTstBase(YggTestBase, tools.YggClass):
             del self.iter_param[k]
         assert(not self.iter_param)
         self.iter_param = {}
+
+    def setup_iteration_mpi(self, mpi=None):
+        r"""Perform setup associated with an MPI iteration."""
+        if mpi:
+            try:
+                import mpi4py  # noqa: F401
+            except ImportError:
+                raise unittest.SkipTest("mpi4py not installed")
+        return mpi
 
     def setup_iteration_language(self, language=None):
         r"""Perform setup associated with a language iteration."""
