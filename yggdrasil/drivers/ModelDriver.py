@@ -453,6 +453,8 @@ class ModelDriver(Driver):
         self.args = args
         self.modified_files = []
         self.wrapper_products = []
+        self._mpi_comm = False
+        self._mpi_requests = {}
         # Update for function
         if self.function:
             if self.is_server:
@@ -1250,8 +1252,6 @@ class ModelDriver(Driver):
                 target=self.enqueue_output_loop,
                 name=self.name + '.EnqueueLoop')
             self.queue_thread.start()
-        self._mpi_comm = False
-        self._mpi_requests = {}
         if multitasking._on_mpi:
             self._mpi_comm = multitasking.MPI.COMM_WORLD
             self.init_mpi()
