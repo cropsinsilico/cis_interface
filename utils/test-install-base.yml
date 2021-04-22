@@ -229,13 +229,11 @@ jobs:
     - name: Run tests (1st)
       id: test1
       run: |
-        mpiexec -n 2 yggrun yggdrasil/examples/gs_lesson4/gs_lesson4_cpp.yml
         yggtest --ci --cov-append ${{ matrix.test-flags1 }}
       continue-on-error: true
     - name: Re-run test failures (1st)
       if: ${{ steps.test1.outcome == 'failure' }}
       run: |
-        mpiexec -n 2 yggrun yggdrasil/examples/gs_lesson4/gs_lesson4_cpp.yml
         yggtest --ci --cov-append ${{ matrix.test-flags1 }} --last-failed --last-failed-no-failures=none --debug
     - name: Run tests (2nd)
       if: matrix.test-flags2 != ''
@@ -245,12 +243,12 @@ jobs:
     - name: Re-run test failures (2nd)
       if: ${{ steps.test2.outcome == 'failure' }}
       run: yggtest --ci --cov-append ${{ matrix.test-flags2 }} --last-failed --last-failed-no-failures=none --debug
-    # - name: Start SSH session
-    #   uses: luchihoratiu/debug-via-ssh@main
-    #   if: ${{ failure() }}  # && env.USEVIRTUALENV == 1 }}
-    #   with:
-    #     NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
-    #     SSH_PASS: ${{ secrets.SSH_PASS }}
+    - name: Start SSH session
+      uses: luchihoratiu/debug-via-ssh@main
+      if: ${{ failure() && matrix.os == 'windows-latest' }}  # && env.USEVIRTUALENV == 1 }}
+      with:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        SSH_PASS: ${{ secrets.SSH_PASS }}
     - name: Combine coverage reports
       continue-on-error: true
       run: |
