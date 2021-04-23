@@ -12,7 +12,7 @@ generate_component_tests('file', TestFileComm, globals(), __file__,
 generate_component_subtests('comm', 'Async', globals(),
                             'yggdrasil.communication.tests',
                             new_attr={'use_async': True},
-                            skip_subtypes=['default'])
+                            skip_subtypes=['default', 'mpi'])
 
 
 def test_open_file_comm():

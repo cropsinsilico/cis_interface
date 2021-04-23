@@ -24,6 +24,7 @@ definitions:
           - buffer
           - default
           - ipc
+          - mpi
           - rmq
           - rmq_async
           - value
@@ -140,6 +141,17 @@ definitions:
       title: comm_base
       type: object
     - anyOf:
+      - additionalProperties: true
+        description: Schema for comm component ['mpi'] subtype.
+        properties:
+          commtype:
+            default: default
+            description: MPI communicator.
+            enum:
+            - mpi
+            type: string
+        title: MPIComm
+        type: object
       - additionalProperties: true
         description: Schema for comm component ['rmq'] subtype.
         properties:
@@ -1686,10 +1698,10 @@ definitions:
             is used.
           type: string
       required:
-      - name
-      - working_dir
       - language
+      - name
       - args
+      - working_dir
       title: model_base
       type: object
     - anyOf:
