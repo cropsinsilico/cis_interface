@@ -1330,7 +1330,7 @@ class run_tsts(SubCommand):
     @classmethod
     def func(cls, args):
         from yggdrasil import config
-        argv = ['pytest']
+        argv = [sys.executable, '-m', 'pytest']
         # test_paths = args.test_paths
         if args.verbose:
             argv.append('-v')
