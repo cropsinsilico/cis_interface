@@ -1,5 +1,6 @@
 import os
 import six
+import sys
 import uuid
 import unittest
 import tempfile
@@ -9,6 +10,7 @@ import flaky
 import subprocess
 from yggdrasil.components import ComponentMeta, import_component
 from yggdrasil import runner, tools, platform
+from yggdrasil.multitasking import _on_mpi
 from yggdrasil.examples import (
     get_example_yaml, get_example_source, get_example_languages,
     ext_map, display_example)
@@ -332,25 +334,28 @@ class ExampleTstBase(YggTestBase, tools.YggClass):
                 ipcrm_queues()
         # Run
         os.environ.update(self.env)
-        if self.iter_param.get('mpi', False):
+        if self.iter_param.get('mpi', False) and (not _on_mpi):
             try:
                 nproc = 2
-                args = ['mpiexec', '-n', str(nproc), 'yggrun']
+                args = ['mpiexec', '-n', str(nproc), sys.executable,
+                        '-m', 'yggdrasil', 'run']
                 if isinstance(self.yaml, str):
                     args.append(self.yaml)
                 else:
                     args += self.yaml
-                args += ['--namespace=%s' % self.namespace, '--production-run']
-                print(subprocess.check_output(args).decode('utf-8'))
+                args += ['--namespace=%s' % self.namespace,
+                         '--production-run']
+                subprocess.check_call(args)
                 assert(not self.expects_error)
-            except subprocess.CalledProcessError as e:
-                print(e.output.decode('utf-8'))
+            except subprocess.CalledProcessError:
                 if not self.expects_error:
                     raise
         else:
             self.runner = runner.get_runner(self.yaml, namespace=self.namespace,
                                             production_run=True)
             self.runner.run()
+            if self.runner.mpi_comm and (self.runner.rank != 0):
+                return
             if self.expects_error:
                 assert(self.runner.error_flag)
             else:
