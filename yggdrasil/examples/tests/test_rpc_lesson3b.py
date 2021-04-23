@@ -6,8 +6,8 @@ class TestExampleRPC3b(ExampleTstBase):
     r"""Test the rpc_lesson3 example."""
     
     example_name = 'rpc_lesson3b'
-    iter_over = ['language', 'mpi']
-    iter_list_mpi = ['', 'mpi']
+    # iter_over = ['language', 'mpi']
+    # iter_list_mpi = ['', 'mpi']
 
     @property
     def input_files(self):

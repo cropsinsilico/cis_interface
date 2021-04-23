@@ -6,8 +6,8 @@ class TestExampleGS4(ExampleTstBase):
     r"""Test the Getting Started Lesson 4 example."""
 
     example_name = 'gs_lesson4'
-    iter_over = ['language', 'mpi']
-    iter_list_mpi = ['', 'mpi']
+    # iter_over = ['language', 'mpi']
+    # iter_list_mpi = ['', 'mpi']
 
     @property
     def input_files(self):

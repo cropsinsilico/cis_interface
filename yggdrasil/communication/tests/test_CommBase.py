@@ -596,7 +596,7 @@ class TestCommBase(YggTestClassInfo):
             return
         self.setup_filters()
         kwargs.setdefault('msg_send', self.msg_filter_send)
-        kwargs.setdefault('msg_recv', self.recv_instance.empty_obj_recv)
+        kwargs.setdefault('msg_recv', self.instance.empty_obj_recv)
         kwargs.setdefault('recv_timeout', self.sleeptime)
         kwargs.setdefault('no_recv', True)
         self.do_send_recv(**kwargs)
@@ -607,9 +607,9 @@ class TestCommBase(YggTestClassInfo):
             return
         self.setup_filters()
         kwargs.setdefault('msg_send', self.msg_filter_recv)
-        kwargs.setdefault('msg_recv', self.recv_instance.empty_obj_recv)
+        kwargs.setdefault('msg_recv', self.instance.empty_obj_recv)
         kwargs.setdefault('recv_timeout', 10 * self.sleeptime)
-        if self.recv_instance.is_async:
+        if self.instance.is_async:
             kwargs.setdefault('no_recv', True)
         self.do_send_recv(**kwargs)
 

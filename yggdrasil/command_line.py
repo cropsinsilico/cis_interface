@@ -259,7 +259,10 @@ class yggrun(SubCommand):
     arguments = [
         (('yamlfile', ),
          {'nargs': '+',
-          'help': "One or more yaml specification files."})]
+          'help': "One or more yaml specification files."}),
+        (('--with-mpi', '--mpi-nproc'),
+         {'type': int, 'default': 1,
+          'help': 'Number of MPI processes to run on.'})]
 
     @classmethod
     def add_arguments(cls, parser, **kwargs):
@@ -269,6 +272,18 @@ class yggrun(SubCommand):
 
     @classmethod
     def func(cls, args):
+        if args.with_mpi > 1:
+            new_args = ['mpiexec', '-n', str(args.with_mpi)]
+            i = 0
+            while i < len(sys.argv):
+                x = sys.argv[i]
+                if x.startswith(('--with-mpi', '--mpi-nproc')):
+                    if '=' not in x:
+                        i += 1
+                else:
+                    new_args.append(x)
+                i += 1
+            return subprocess.check_call(new_args)
         from yggdrasil import runner, config
         prog = sys.argv[0].split(os.path.sep)[-1]
         with config.parser_config(args):
@@ -1162,7 +1177,7 @@ class run_tsts(SubCommand):
          {'nargs': '+', 'action': 'extend', 'type': str,
           'choices': ['all', 'top', 'examples', 'examples_part1',
                       'examples_part2', 'demos', 'types', 'timing',
-                      'connections', 'models'],
+                      'connections', 'models', 'mpi'],
           'help': 'Test suite(s) that should be run.',
           'dest': 'test_suites'}),
         (('--pytest-config', '-c'),
@@ -1177,7 +1192,10 @@ class run_tsts(SubCommand):
          {'help': 'Define root directory for tests.'}),
         (('--count', ),
          {'type': int, 'default': 1,
-          'help': 'Number of times to repeat a test.'})]
+          'help': 'Number of times to repeat a test.'}),
+        (('--with-mpi', '--mpi-nproc'),
+         {'type': int, 'default': 1,
+          'help': 'Number of MPI processes to run tests on.'})]
     allow_unknown = True
 
     @classmethod
@@ -1208,7 +1226,7 @@ class run_tsts(SubCommand):
             if 'all' in args.test_suites:
                 args.test_suites.remove('all')
                 for x in ['top', 'examples', 'demos', 'types', 'timing',
-                          'connections', 'models']:
+                          'connections', 'models', 'mpi']:
                     if x not in args.test_suites:
                         args.test_suites.append(x)
             for x in args.test_suites:
@@ -1253,6 +1271,17 @@ class run_tsts(SubCommand):
                     test_paths.append(
                         os.path.join('drivers', 'tests',
                                      'test_*ModelDriver.py'))
+                elif x == 'mpi':
+                    args.enable_examples = True
+                    if args.with_mpi == 1:
+                        args.with_mpi = 2
+                    test_paths += [
+                        os.path.join('communication', 'tests',
+                                     'test_MPIComm.py'),
+                        os.path.join('examples', 'tests',
+                                     'test_gs_lesson4.py'),
+                        os.path.join('examples', 'tests',
+                                     'test_rpc_lesson3b.py')]
         if (not test_paths) and all(x.startswith('-') for x in extra):
             test_paths.append(package_dir)
         # Get expanded tests to allow for paths that are relative to
@@ -1332,6 +1361,8 @@ class run_tsts(SubCommand):
         from yggdrasil import config
         argv = [sys.executable, '-m', 'pytest']
         # test_paths = args.test_paths
+        if args.with_mpi > 1:
+            argv = ['mpiexec', '-n', str(args.with_mpi)] + argv + ['--with-mpi']
         if args.verbose:
             argv.append('-v')
         if args.nocapture:

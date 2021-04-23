@@ -1,3 +1,4 @@
+import pytest
 import unittest
 from yggdrasil import tools, platform
 from yggdrasil.tests import MagicTestError, assert_raises, timeout
@@ -6,13 +7,14 @@ from yggdrasil.components import import_component
 from yggdrasil.drivers.tests import test_Driver as parent
 from yggdrasil.drivers.ConnectionDriver import ConnectionDriver
 from yggdrasil.communication import (
-    new_comm, CommBase, ZMQComm, IPCComm, RMQComm)
+    new_comm, CommBase, ZMQComm, IPCComm, RMQComm, MPIComm)
 
 
 _default_comm = tools.get_default_comm()
 _zmq_installed = ZMQComm.ZMQComm.is_installed(language='python')
 _ipc_installed = IPCComm.IPCComm.is_installed(language='python')
 _rmq_installed = RMQComm.RMQComm.is_installed(language='python')
+_mpi_installed = MPIComm.MPIComm.is_installed(language='python')
 
 
 @unittest.skipIf(platform._is_win, ("Temp skip connection tests on windows for "
@@ -555,9 +557,16 @@ for k in comm_types:
     elif k in ['IPCComm', 'ipc']:
         flag_func = unittest.skipIf(not _ipc_installed,
                                     "IPC library not installed")
+    elif k in ['MPIComm', 'mpi']:
+        flag_func = [unittest.skipIf(not _mpi_installed,
+                                     "MPI library not installed"),
+                     pytest.mark.mpi(min_size=2)]
     if flag_func is not None:
-        ocls = flag_func(ocls)
-        icls = flag_func(icls)
+        if not isinstance(flag_func, list):
+            flag_func = [flag_func]
+        for x in flag_func:
+            ocls = x(ocls)
+            icls = x(icls)
     # Add class to globals
     if k != 'value':
         globals()[ocls.__name__] = ocls

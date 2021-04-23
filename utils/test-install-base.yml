@@ -243,6 +243,10 @@ jobs:
     - name: Re-run test failures (2nd)
       if: ${{ steps.test2.outcome == 'failure' }}
       run: yggtest --ci --cov-append ${{ matrix.test-flags2 }} --last-failed --last-failed-no-failures=none --debug
+    - name: Run MPI tests
+      if: env.INSTALLMPI == 1
+      id: mpi
+      run: yggtest --ci --cov-append --test-suite=mpi --language=python
     - name: Start SSH session
       uses: luchihoratiu/debug-via-ssh@main
       if: ${{ failure() && matrix.os != 'windows-latest' }}  # && env.USEVIRTUALENV == 1 }}
