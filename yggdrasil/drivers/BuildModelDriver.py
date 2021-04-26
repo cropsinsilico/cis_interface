@@ -494,6 +494,7 @@ class BuildModelDriver(CompiledModelDriver):
         """
         kwargs['working_dir'] = self.compile_working_dir
         kwargs['target_compiler'] = self.target_compiler
+        kwargs['suffix'] = ''
         return super(BuildModelDriver, self).compile_model(**kwargs)
         
     def cleanup(self):
