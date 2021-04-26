@@ -323,7 +323,8 @@ class ExampleTstBase(YggTestBase, tools.YggClass):
                 make_ext = '_windows'
             else:
                 make_ext = '_linux'
-            shutil.copy(makefile + make_ext, makefile)
+            if not os.path.isfile(makefile):
+                shutil.copy(makefile + make_ext, makefile)
         # Check that comm is installed
         if self.comm in ['ipc', 'IPCComm']:
             from yggdrasil.communication.IPCComm import (
@@ -369,9 +370,11 @@ class ExampleTstBase(YggTestBase, tools.YggClass):
         finally:
             self.example_cleanup()
             # Remove copied makefile
-            if self.language == 'make':
+            if (((self.language == 'make')
+                 and (not (self.runner.mpi_comm and (self.runner.rank != 0))))):
                 makefile = os.path.join(self.yamldir, 'src', 'Makefile')
                 if os.path.isfile(makefile):
+                    self.runner.info("Removing makefile")
                     os.remove(makefile)
             self.runner = None
 
