@@ -72,14 +72,18 @@ class TestMPIComm(test_CommBase.TestCommBase):
         if self.instance.direction == 'recv':
             self.instance.drain_server_signon_messages()
 
-    def sync(self, check_equal=False):
+    def sync(self, get_tags=False, check_equal=False):
         global _tag
-        all_tag = self.mpi_comm.alltoall(
-            [self.instance.tag] * self.mpi_comm.Get_size())
-        if check_equal:
-            assert(all((x == self.instance.tag) for x in all_tag))
-        _tag = all_tag[self.mpi_rank]
-        return all_tag
+        if check_equal or get_tags:
+            all_tag = self.mpi_comm.alltoall(
+                [self.instance.tag] * self.mpi_comm.Get_size())
+            if check_equal:
+                assert(all((x == self.instance.tag) for x in all_tag))
+            _tag = all_tag[self.mpi_rank]
+            return all_tag
+        else:
+            _tag = self.instance.tag
+            self.mpi_comm.Barrier()
 
     def teardown(self, *args, **kwargs):
         r"""Destroy comm object pair."""
@@ -90,7 +94,7 @@ class TestMPIComm(test_CommBase.TestCommBase):
             # Don't keep receiving or there will never be a balence
             # between receive requests and sent messages
             self.instance._close_backlog(wait=True)
-        all_tag = self.sync()
+        all_tag = self.sync(get_tags=True)
         if self.instance.direction == 'send':
             for _ in range(max(all_tag) - all_tag[self.mpi_rank]):
                 self.instance.tag += 1
@@ -314,6 +318,8 @@ class TestMPIComm(test_CommBase.TestCommBase):
             flag, msg_recv = self.recv_instance.recv(timeout=self.sleeptime)
             assert(flag)
             assert(not msg_recv)
+        else:
+            self.send_instance.sleep()
 
     def setup_filters(self):
         r"""Add filters to send/recv instances for testing filters."""
@@ -359,7 +365,13 @@ class TestMPIComm(test_CommBase.TestCommBase):
             assert(flag)
             # self.send_instance.purge()
             # self.assert_equal(self.send_instance.n_msg, 0)
-            self.sync()
+            T = self.send_instance.start_timeout()
+            while ((not T.is_out) and (self.send_instance.n_msg
+                                       > 0)):  # pragma: debug
+                self.send_instance.sleep()
+            if self.use_async:
+                self.send_instance._wrapped.wait_for_confirm()
+            # self.sync()
         else:
             self.assert_equal(self.recv_instance.n_msg, nrecv_init)
             if self.recv_instance.is_async:
@@ -376,7 +388,7 @@ class TestMPIComm(test_CommBase.TestCommBase):
             # Purge recv while closed
             self.recv_instance.close()
             self.recv_instance.purge()
-            self.sync()
+            # self.sync()
 
 
 @pytest.mark.mpi(min_size=2)
