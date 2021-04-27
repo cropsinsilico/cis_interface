@@ -251,6 +251,12 @@ jobs:
       if: env.INSTALLMPI == 1 && matrix.os != 'windows-latest'
       id: mpi
       run: yggtest --ci --cov-append --test-suite=mpi
+    - name: Start SSH session
+      uses: luchihoratiu/debug-via-ssh@main
+      if: ${{ failure() && matrix.os != 'windows-latest' }}
+      with:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        SSH_PASS: ${{ secrets.SSH_PASS }}
     - name: Combine coverage reports
       continue-on-error: true
       run: '# ls .*
@@ -525,6 +531,12 @@ jobs:
       if: env.INSTALLMPI == 1 && matrix.os != 'windows-latest'
       id: mpi
       run: yggtest --ci --cov-append --test-suite=mpi
+    - name: Start SSH session
+      uses: luchihoratiu/debug-via-ssh@main
+      if: ${{ failure() && matrix.os != 'windows-latest' }}
+      with:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        SSH_PASS: ${{ secrets.SSH_PASS }}
     - name: Combine coverage reports
       continue-on-error: true
       run: '# ls .*
@@ -779,6 +791,12 @@ jobs:
       if: env.INSTALLMPI == 1 && matrix.os != 'windows-latest'
       id: mpi
       run: yggtest --ci --cov-append --test-suite=mpi
+    - name: Start SSH session
+      uses: luchihoratiu/debug-via-ssh@main
+      if: ${{ failure() && matrix.os != 'windows-latest' }}
+      with:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        SSH_PASS: ${{ secrets.SSH_PASS }}
     - name: Combine coverage reports
       continue-on-error: true
       run: '# ls .*
@@ -1035,6 +1053,12 @@ jobs:
       if: env.INSTALLMPI == 1 && matrix.os != 'windows-latest'
       id: mpi
       run: yggtest --ci --cov-append --test-suite=mpi
+    - name: Start SSH session
+      uses: luchihoratiu/debug-via-ssh@main
+      if: ${{ failure() && matrix.os != 'windows-latest' }}
+      with:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        SSH_PASS: ${{ secrets.SSH_PASS }}
     - name: Combine coverage reports
       continue-on-error: true
       run: '# ls .*
@@ -1289,6 +1313,12 @@ jobs:
       if: env.INSTALLMPI == 1 && matrix.os != 'windows-latest'
       id: mpi
       run: yggtest --ci --cov-append --test-suite=mpi
+    - name: Start SSH session
+      uses: luchihoratiu/debug-via-ssh@main
+      if: ${{ failure() && matrix.os != 'windows-latest' }}
+      with:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        SSH_PASS: ${{ secrets.SSH_PASS }}
     - name: Combine coverage reports
       continue-on-error: true
       run: '# ls .*

@@ -41,7 +41,7 @@ class MPIRequest(object):
             self.size_req = self.comm.Isend([self.size, MPI.INT], **kwargs)
         else:
             method = 'Irecv'
-            args = ([self.size, MPI.CHAR], )
+            args = ([self.size, MPI.INT], )
             kwargs['source'] = self.address
         logger.debug("rank = %d, method = %s, args = %s, kwargs = %s",
                      self.comm.Get_rank(), method, args, kwargs)
