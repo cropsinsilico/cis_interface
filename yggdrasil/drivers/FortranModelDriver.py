@@ -806,7 +806,10 @@ class FortranModelDriver(CompiledModelDriver):
                     if match_module:
                         module = match_module.groupdict()['module']
                     else:
-                        module = '%s_module' % kws['function']
+                        if kwargs.get('model_name', None):
+                            module = '%s_module' % kwargs['model_name']
+                        else:
+                            module = '%s_module' % kws['function']
                         kws['module'] = module
                     lines.insert(last_use + 1, 'use %s' % module)
                     last_use += 1

@@ -5,6 +5,7 @@ import copy
 import shutil
 import logging
 import sysconfig
+import threading
 from collections import OrderedDict
 from yggdrasil import platform, constants
 from yggdrasil.components import import_component
@@ -16,6 +17,27 @@ from yggdrasil.drivers import CModelDriver
 
 
 logger = logging.getLogger(__name__)
+_buildfile_locks_lock = threading.RLock()
+_buildfile_locks = {}
+
+
+def get_buildfile_lock(fname, context):
+    r"""Get a lock for a buildfile to prevent simultaneous access,
+    creating one as necessary.
+
+    Args:
+        name (str): Build file.
+        context (threading.Context): Threading context.
+
+    Returns:
+        threading.RLock: Lock for the buildfile.
+
+    """
+    global _buildfile_locks
+    with _buildfile_locks_lock:
+        if fname not in _buildfile_locks:
+            _buildfile_locks[fname] = context.RLock()
+    return _buildfile_locks[fname]
 
 
 class CMakeConfigure(BuildToolBase):
@@ -766,6 +788,9 @@ class CMakeModelDriver(BuildModelDriver):
         else:
             self.builddir_base = 'build_%s' % self.target
         super(CMakeModelDriver, self).parse_arguments(args, **kwargs)
+        self.buildfile_lock = get_buildfile_lock(self.buildfile, self.context)
+        if self._mpi_rank > 0:
+            self.send_mpi(self.buildfile, tag=self._mpi_tags['CMAKE_FILE'])
 
     @property
     def buildfile_orig(self):
@@ -777,7 +802,7 @@ class CMakeModelDriver(BuildModelDriver):
     def buildfile_ygg(self):
         r"""str: Full path to the verison of the CMakeLists.txt that has been
         updated w/ yggdrasil compilation flags."""
-        return '_ygg'.join(os.path.splitext(self.buildfile))
+        return ('_ygg_%s' % self.name).join(os.path.splitext(self.buildfile))
     
     def write_wrappers(self, **kwargs):
         r"""Write any wrappers needed to compile and/or run a model.
@@ -1029,7 +1054,10 @@ class CMakeModelDriver(BuildModelDriver):
             return self.call_linker(self.builddir, target=target, out=target,
                                     overwrite=True, working_dir=self.working_dir,
                                     allow_error=True, **kwargs)
-        else:
+        if not kwargs.get('dry_run', False):
+            self.buildfile_lock.acquire()
+        out = None
+        try:
             default_kwargs = dict(target=target,
                                   sourcedir=self.sourcedir,
                                   builddir=self.builddir,
@@ -1038,10 +1066,19 @@ class CMakeModelDriver(BuildModelDriver):
             for k, v in default_kwargs.items():
                 kwargs.setdefault(k, v)
             if (not kwargs.get('dry_run', False)) and os.path.isfile(self.buildfile):
-                shutil.copy2(self.buildfile, self.buildfile_orig)
+                if not os.path.isfile(self.buildfile_orig):
+                    shutil.copy2(self.buildfile, self.buildfile_orig)
+                    self.modified_files.append((self.buildfile_orig,
+                                                self.buildfile))
                 shutil.copy2(self.buildfile_ygg, self.buildfile)
-                self.modified_files.append((self.buildfile_orig, self.buildfile))
-            return super(CMakeModelDriver, self).compile_model(**kwargs)
+            out = super(CMakeModelDriver, self).compile_model(**kwargs)
+        finally:
+            if not kwargs.get('dry_run', False):
+                if self._mpi_rank > 0:
+                    self.send_mpi('CMAKE_FINISHED_COMPILE',
+                                  tag=self._mpi_tags['CMAKE_COMPILED'])
+                self.buildfile_lock.release()
+        return out
 
     @classmethod
     def prune_sh_gcc(cls, path, gcc):  # pragma: appveyor

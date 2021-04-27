@@ -246,7 +246,7 @@ jobs:
     - name: Run MPI tests
       if: env.INSTALLMPI == 1 && matrix.os != 'windows-latest'
       id: mpi
-      run: yggtest --ci --cov-append --test-suite=mpi --language python make
+      run: yggtest --ci --cov-append --test-suite=mpi
     # - name: Start SSH session
     #   uses: luchihoratiu/debug-via-ssh@main
     #   if: ${{ failure() && matrix.os != 'windows-latest' }}  # && env.USEVIRTUALENV == 1 }}
