@@ -1195,7 +1195,10 @@ class run_tsts(SubCommand):
           'help': 'Number of times to repeat a test.'}),
         (('--with-mpi', '--mpi-nproc'),
          {'type': int, 'default': 1,
-          'help': 'Number of MPI processes to run tests on.'})]
+          'help': 'Number of MPI processes to run tests on.'}),
+        (('--additional-info', '-r'),
+         {'type': str, 'default': '',
+          'help': 'Display additional info for test results.'})]
     allow_unknown = True
 
     @classmethod
@@ -1387,6 +1390,8 @@ class run_tsts(SubCommand):
             argv += ['--ignore=%s' % x for x in args.ignore]
         if args.rootdir:
             argv += ['--rootdir=%s' % args.rootdir]
+        if args.additional_info:
+            argv += ['-r', args.additional_info]
         argv += args.extra
         # Run test command and perform cleanup before logging any errors
         logger.info("Running %s from %s", argv, os.getcwd())
@@ -1444,9 +1449,9 @@ class run_tsts(SubCommand):
                         error_code = x_error_code
                         if args.stop:
                             break
-            except BaseException:
-                logger.exception('Error in running test.')
-                error_code = -1
+            # except BaseException:
+            #     logger.exception('Error in running test.')
+            #     error_code = -1
             finally:
                 os.chdir(initial_dir)
                 # if os.path.isfile(pth_file):

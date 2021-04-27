@@ -418,9 +418,14 @@ class ModelDriver(Driver):
                         + ['queue', 'queue_thread',
                            'event_process_kill_called',
                            'event_process_kill_complete'])
+    _mpi_tags = {'START': 1,
+                 'STOP_RANK0': 2,  # Stopped by partner
+                 'STOP_RANKX': 3,  # Stopped by root
+                 'CMAKE_FILE': 4,
+                 'CMAKE_COMPILED': 5}
 
     def __init__(self, name, args, model_index=0, copy_index=-1, clients=[],
-                 **kwargs):
+                 mpi_rank=0, **kwargs):
         self.model_outputs_in_inputs = kwargs.pop('outputs_in_inputs', None)
         super(ModelDriver, self).__init__(name, **kwargs)
         if self.overwrite is None:
@@ -458,7 +463,15 @@ class ModelDriver(Driver):
         self.modified_files = []
         self.wrapper_products = []
         self._mpi_comm = False
+        self._mpi_rank = 0
+        self._mpi_size = 1
         self._mpi_requests = {}
+        self._mpi_tag = (len(self._mpi_tags) * self.model_index)
+        if multitasking._on_mpi:
+            self._mpi_comm = multitasking.MPI.COMM_WORLD
+            self._mpi_rank = self._mpi_comm.Get_rank()
+            self._mpi_size = self._mpi_comm.Get_size()
+            self._mpi_partner_rank = mpi_rank
         # Update for function
         if self.function:
             if self.is_server:
@@ -486,7 +499,8 @@ class ModelDriver(Driver):
                     inputs=copy.deepcopy(self.inputs),
                     outputs=copy.deepcopy(self.outputs),
                     outputs_in_inputs=self.model_outputs_in_inputs,
-                    client_comms=client_comms, copies=self.copies)
+                    client_comms=client_comms, copies=self.copies,
+                    model_name=self.name)
                 with open(args[0], 'w') as fd:
                     fd.write('\n'.join(lines))
         # Parse arguments
@@ -1257,7 +1271,6 @@ class ModelDriver(Driver):
                 name=self.name + '.EnqueueLoop')
             self.queue_thread.start()
         if multitasking._on_mpi:
-            self._mpi_comm = multitasking.MPI.COMM_WORLD
             self.init_mpi()
 
     def queue_close(self):
@@ -1301,16 +1314,37 @@ class ModelDriver(Driver):
 
     def init_mpi(self):
         r"""Initialize MPI communicator."""
-        if self._mpi_comm.Get_rank() == 0:
+        if self._mpi_rank == 0:
             self._mpi_comm = None
         else:
-            self._mpi_comm.recv(source=0, tag=1)
+            self.recv_mpi(tag=self._mpi_tags['START'])
             self._mpi_requests['stopped'] = {
-                'request': self._mpi_comm.irecv(source=0, tag=3)}
+                'request': self.recv_mpi(tag=self._mpi_tags['STOP_RANKX'],
+                                         dont_block=True)}
 
-    def stop_mpi_partner(self, msg=None, dest=0, tag=2):
+    def send_mpi(self, msg, tag=0, dont_block=False):
+        r"""Send an MPI message."""
+        self.debug("%d: %s", tag, msg)
+        kws = {'dest': self._mpi_partner_rank, 'tag': (self._mpi_tag + tag)}
+        if dont_block:
+            return self._mpi_comm.isend(msg, **kws)
+        else:
+            return self._mpi_comm.send(msg, **kws)
+
+    def recv_mpi(self, tag=0, dont_block=False):
+        r"""Receive an MPI message."""
+        self.debug('%d', tag)
+        kws = {'source': self._mpi_partner_rank, 'tag': (self._mpi_tag + tag)}
+        if dont_block:
+            return self._mpi_comm.irecv(**kws)
+        else:
+            return self._mpi_comm.recv(**kws)
+
+    def stop_mpi_partner(self, msg=None, dest=0, tag=None):
         r"""Send a message to stop the MPI partner model on the main process."""
         if self._mpi_comm and (not self.check_mpi_request('stopping')):
+            if tag is None:
+                tag = self._mpi_tags['STOP_RANK0']
             if msg is None:
                 if self.errors:
                     msg = 'ERROR'
@@ -1318,7 +1352,7 @@ class ModelDriver(Driver):
                     msg = 'STOPPING'
             self._mpi_requests['stopping'] = {
                 'result': True,  # Don't call test()
-                'request': self._mpi_comm.isend(msg, dest=dest, tag=tag)}
+                'request': self.send_mpi(msg, tag=tag)}
 
     def check_mpi_request(self, name):
         r"""Check if a request has been completed.
@@ -1908,7 +1942,7 @@ class ModelDriver(Driver):
     def write_model_wrapper(cls, model_file, model_function,
                             inputs=[], outputs=[],
                             outputs_in_inputs=None, verbose=False,
-                            client_comms=[], copies=1):
+                            client_comms=[], copies=1, model_name=None):
         r"""Return the lines required to wrap a model function as an integrated
         model.
 
@@ -1930,6 +1964,8 @@ class ModelDriver(Driver):
             copies (int, optional): Number of times the model driver is
                 duplicated. If more than one, no error will be raised in the
                 event there is never a call the the function. Defaults to 1.
+            model_name (str, optional): Name given to the model. Defaults to
+                None.
 
         Returns:
             list: Lines of code wrapping the provided model with the necessary
@@ -2075,6 +2111,7 @@ class ModelDriver(Driver):
                 prefix = [cls.format_function_param(
                     'interface', interface_library=ygglib)]
         out = cls.write_executable(lines, prefix=prefix,
+                                   model_name=model_name,
                                    imports={'filename': model_file,
                                             'function': model_function})
         if verbose:  # pragma: debug
@@ -2925,7 +2962,7 @@ checking if the model flag indicates
         return out
         
     @classmethod
-    def write_executable_import(cls, **kwargs):
+    def write_executable_import(cls, model_name=None, **kwargs):
         r"""Add import statements to executable lines.
        
         Args:
@@ -2949,7 +2986,8 @@ checking if the model flag indicates
 
     @classmethod
     def write_executable(cls, lines, prefix=None, suffix=None,
-                         function_definitions=None, imports=None):
+                         function_definitions=None, imports=None,
+                         model_name=None):
         r"""Return the lines required to complete a program that will run
         the provided lines.
 
@@ -2966,6 +3004,8 @@ checking if the model flag indicates
             imports (list, optional): Kwargs for packages that should
                 be imported for use by the executable. Defaults to
                 None and is ignored.
+            model_name (str, optional): Name given to the model. Defaults to
+                None.
 
         Returns:
             lines: Lines of code wrapping the provided lines with the

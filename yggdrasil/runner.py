@@ -454,6 +454,8 @@ class YggRunner(YggClass):
                     for k in remove_dup:
                         self.modeldrivers.pop(k)
                     self.modeldrivers.update(add_dup)
+                    for i, v in enumerate(self.modeldrivers.values()):
+                        v['model_index'] = i
                     # Sort tasks
                     size = self.mpi_comm.Get_size()
                     models = [[] for _ in range(size)]
@@ -475,12 +477,13 @@ class YggRunner(YggClass):
                 self.modeldrivers = dict(
                     [x for x in self.mpi_comm.scatter(models, root=0)
                      if (x is not None)])
-                self.info("Models on process %d: %s", self.rank,
+                self.info("Models on MPI process %d: %s", self.rank,
                           list(self.modeldrivers.keys()))
                 if self.rank == 0:
                     temp = {}
                     for i, (k, v) in enumerate(self.all_modeldrivers.items()):
                         if k not in self.modeldrivers:
+                            v['partner_driver'] = v['driver']
                             v['language'] = 'mpi'
                             v['driver'] = 'MPIPartnerModel'
                         temp[k] = v

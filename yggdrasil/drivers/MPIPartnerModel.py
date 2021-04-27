@@ -1,5 +1,6 @@
 import shutil
 from yggdrasil.drivers.ModelDriver import ModelDriver
+from yggdrasil.drivers.CMakeModelDriver import get_buildfile_lock
 from yggdrasil.multitasking import MPI
 
 
@@ -19,8 +20,14 @@ class MPIPartnerModel(ModelDriver):
 
     def __init__(self, *args, **kwargs):
         kwargs.pop('function', None)
-        self.mpi_rank = kwargs.pop('mpi_rank')
         super(MPIPartnerModel, self).__init__(*args, **kwargs)
+        self.buildfile_lock = None
+        if self.yml['partner_driver'] == 'CMakeModelDriver':
+            self.buildfile = self.recv_mpi(tag=self._mpi_tags['CMAKE_FILE'])
+            self.buildfile_lock = get_buildfile_lock(self.buildfile,
+                                                     self.context)
+            with self.buildfile_lock:
+                self.recv_mpi(tag=self._mpi_tags['CMAKE_COMPILED'])
 
     @classmethod
     def is_language_installed(self):
@@ -99,9 +106,10 @@ class MPIPartnerModel(ModelDriver):
         
     def init_mpi(self):
         r"""Initialize MPI communicator."""
-        self._mpi_comm.send('START', dest=self.mpi_rank, tag=1)
+        self.send_mpi('START', tag=self._mpi_tags['START'])
         self._mpi_requests['stopped'] = {
-            'request': self._mpi_comm.irecv(source=self.mpi_rank, tag=2)}
+            'request': self.recv_mpi(tag=self._mpi_tags['STOP_RANK0'],
+                                     dont_block=True)}
 
     def stop_mpi_partner(self):
         r"""Send a message to stop the MPI partner model on the main process."""
@@ -109,8 +117,9 @@ class MPIPartnerModel(ModelDriver):
             msg = 'STOP'
         else:
             msg = 'ERROR'
-        super(MPIPartnerModel, self).stop_mpi_partner(msg, dest=self.mpi_rank,
-                                                      tag=3)
+        super(MPIPartnerModel, self).stop_mpi_partner(
+            msg, dest=self._mpi_partner_rank,
+            tag=self._mpi_tags['STOP_RANKX'])
 
     def run_loop(self):
         r"""Loop to check if model is still running."""
