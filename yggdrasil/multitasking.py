@@ -10,12 +10,16 @@ import multiprocessing
 from yggdrasil.tools import YggClass
 MPI = None
 _on_mpi = False
+_mpi_rank = -1
 if os.environ.get('YGG_SUBPROCESS', False):
-    _on_mpi = (os.environ.get('YGG_ON_MPI', '0') == '1')
+    if 'YGG_MPI_RANK' in os.environ:
+        _on_mpi = True
+        _mpi_rank = int(os.environ['YGG_MPI_RANK'])
 else:
     try:
         from mpi4py import MPI
         _on_mpi = (MPI.COMM_WORLD.Get_size() > 1)
+        _mpi_rank = MPI.COMM_WORLD.Get_rank()
     except ImportError:
         pass
 
