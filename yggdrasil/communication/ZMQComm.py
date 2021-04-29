@@ -81,7 +81,7 @@ def get_socket_type_mate(t_in):
         raise ValueError('Could not locate socket type %s' % t_in)
 
 
-def format_address(protocol, host, port=None):
+def format_address(protocol, host, port=None, partner_mpi_ranks=[]):
     r"""Format an address based on its parts.
 
     Args:
@@ -89,6 +89,8 @@ def format_address(protocol, host, port=None):
         host (str): Host that address should point to.
         port (int, optional): Port that address should point to. Defaults to
             None and is not added to the address.
+        partner_mpi_ranks (list, optional): Ranks of processes of this comm's
+            partner comm(s). Defaults to [].
 
     Returns:
         str: Complete address.
@@ -98,13 +100,13 @@ def format_address(protocol, host, port=None):
 
     """
     if host == 'localhost':
-        if multitasking._on_mpi:
-            assert(protocol not in ['inproc', 'ipc'])
-            # TODO: Get address
-            logger.error("TODO: Get full address from config")
-            host = '127.0.0.1'
-        else:
-            host = '127.0.0.1'
+        host = '127.0.0.1'
+        if multitasking._mpi_rank >= 0:
+            for x in partner_mpi_ranks:
+                if x != multitasking._mpi_rank:
+                    assert(protocol not in ['inproc', 'ipc'])
+                    # TODO: Get address from config
+                    logger.error("TODO: Get full address from config")
     if protocol in ['inproc', 'ipc']:
         address = "%s://%s" % (protocol, host)
     elif protocol not in _socket_protocols:
@@ -221,6 +223,8 @@ class ZMQProxy(CommBase.CommServer):
             raised. Defaults to -1.
         nretry (int, optional): Number of times to try binding the sockets to
             the addresses. Defaults to 1.
+        partner_mpi_ranks (list, optional): Ranks of processes of this comm's
+            partner comm(s). Defaults to [].
         **kwargs: Additional keyword arguments are passed to the parent class.
 
     Attributes:
@@ -237,7 +241,7 @@ class ZMQProxy(CommBase.CommServer):
     # server_signoff_msg = b'ZMQ_SERVER_SIGNING_OFF::'
     
     def __init__(self, srv_address, zmq_context=None, retry_timeout=-1,
-                 nretry=1, **kwargs):
+                 nretry=1, partner_mpi_ranks=[], **kwargs):
         # Get parameters
         srv_param = parse_address(srv_address)
         cli_param = dict()
@@ -247,7 +251,8 @@ class ZMQProxy(CommBase.CommServer):
         # Create new address for the frontend
         if cli_param['protocol'] in ['inproc', 'ipc']:
             cli_param['host'] = get_ipc_host()
-        cli_address = format_address(cli_param['protocol'], cli_param['host'])
+        cli_address = format_address(cli_param['protocol'], cli_param['host'],
+                                     partner_mpi_ranks=partner_mpi_ranks)
         self.cli_socket = create_socket(zmq_context, zmq.ROUTER)
         self.cli_address = bind_socket(self.cli_socket, cli_address,
                                        nretry=nretry,
@@ -512,7 +517,8 @@ class ZMQComm(CommBase.CommBase):
         self._n_reply_recv = {}
         self._server_class = ZMQProxy
         self._server_kwargs = dict(zmq_context=self.context,
-                                   nretry=4, retry_timeout=2.0 * self.sleeptime)
+                                   nretry=4, retry_timeout=2.0 * self.sleeptime,
+                                   partner_mpi_ranks=self.partner_mpi_ranks)
         self.cli_address = None
         self.cli_socket = None
         super(ZMQComm, self)._init_before_open(**kwargs)
@@ -615,7 +621,8 @@ class ZMQComm(CommBase.CommBase):
         return self.address_param['port']
 
     @classmethod
-    def new_comm_kwargs(cls, name, protocol=None, host=None, port=None, **kwargs):
+    def new_comm_kwargs(cls, name, protocol=None, host=None, port=None,
+                        partner_mpi_ranks=[], **kwargs):
         r"""Initialize communication with new queue.
 
         Args:
@@ -627,6 +634,8 @@ class ZMQComm(CommBase.CommBase):
                 'inproc' protocol. Defaults to 'localhost'.
             port (int, optional): The port used. Invalid for 'inproc' protocol.
                 Defaults to None and a random port is choosen.
+            partner_mpi_ranks (list, optional): Ranks of processes of this comm's
+                partner comm(s). Defaults to [].
             **kwargs: Additional keywords arguments are returned as keyword
                 arguments for the new comm.
 
@@ -643,7 +652,8 @@ class ZMQComm(CommBase.CommBase):
             else:
                 host = 'localhost'
         if 'address' not in kwargs:
-            kwargs['address'] = format_address(protocol, host, port=port)
+            kwargs['address'] = format_address(protocol, host, port=port,
+                                               partner_mpi_ranks=partner_mpi_ranks)
         return args, kwargs
 
     @property
@@ -785,7 +795,8 @@ class ZMQComm(CommBase.CommBase):
         if self.reply_socket_send is None:
             s = create_socket(self.context, zmq.REP)
             s.setsockopt(zmq.IMMEDIATE, 1)
-            address = format_address(_default_protocol, 'localhost')
+            address = format_address(_default_protocol, 'localhost',
+                                     partner_mpi_ranks=self.partner_mpi_ranks)
             address = bind_socket(s, address)
             self.register_comm('REPLY_SEND_' + address, s)
             with self.reply_socket_lock:
@@ -973,7 +984,8 @@ class ZMQComm(CommBase.CommBase):
             if back_messages:  # pragma: debug
                 # for x in back_messages:
                 #     self._send_client_msg(x)
-                raise RuntimeError("backlogged messages not supported.")
+                raise RuntimeError("backlogged messages not supported: %s"
+                                   % back_messages)
         super(ZMQComm, self)._close(linger=linger)
         if self.cli_socket is not None:
             self.cli_socket.disconnect(self.cli_address)
@@ -1173,8 +1185,6 @@ class ZMQComm(CommBase.CommBase):
                 if self.socket_type_name == 'ROUTER':
                     kwargs['flags'] |= zmq.SNDMORE
                     self.socket.send(identity, **kwargs)
-                    # self.socket.send_multipart([identity, total_msg],
-                    #                            **kwargs)
                 else:
                     self.socket.send(total_msg, **kwargs)
                 TemporaryCommunicationError.reset((self.address, "zmq.EAGAIN"))

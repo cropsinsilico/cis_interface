@@ -22,17 +22,36 @@ class DuplicatedModelDriver(Driver):
 
     name_format = "%s_copy%d"
 
-    def __init__(self, yml, **kwargs):
+    def __init__(self, yml, duplicates=None, **kwargs):
         kwargs.update(yml)
         self.copies = []
-        for iyml in self.get_yaml_copies(yml):
-            ikws = copy.deepcopy(kwargs)
-            ikws.update(iyml)
-            self.copies.append(create_driver(yml=iyml, **ikws))
+        if duplicates is not None:
+            for x in duplicates:
+                if isinstance(x, Driver):
+                    self.copies.append(x)
+                else:
+                    ikws = copy.deepcopy(kwargs)
+                    ikws.update(x)
+                    self.copies.append(create_driver(yml=x, **ikws))
+        else:
+            for iyml in self.get_yaml_copies(yml):
+                ikws = copy.deepcopy(kwargs)
+                ikws.update(iyml)
+                self.copies.append(create_driver(yml=iyml, **ikws))
         super(DuplicatedModelDriver, self).__init__(**kwargs)
 
     @classmethod
     def get_yaml_copies(cls, yml):
+        r"""Get a list of yamls for creating duplicate models for the model
+        described by the provided yaml.
+
+        Args:
+            yml (dict): Input parameters for creating a model driver.
+
+        Returns:
+            list: Copies of input parameters for creating duplicate models.
+
+        """
         env_copy_specific = {}
         for i in range(yml['copies']):
             iname = cls.name_format % (yml['name'], i)
@@ -43,7 +62,7 @@ class DuplicatedModelDriver(Driver):
             iyml['name'] = cls.name_format % (yml['name'], i)
             iyml['copy_index'] = i
             # Update environment to reflect addition of suffix
-            iyml['env'] = yml['env'].copy()
+            iyml['env'] = yml.get('env', {}).copy()
             iyml['env'].update(env_copy_specific.get(iyml['name'], {}))
             copies.append(iyml)
         return copies

@@ -111,15 +111,12 @@ class MPIPartnerModel(ModelDriver):
             'request': self.recv_mpi(tag=self._mpi_tags['STOP_RANK0'],
                                      dont_block=True)}
 
-    def stop_mpi_partner(self):
+    def stop_mpi_partner(self, **kwargs):
         r"""Send a message to stop the MPI partner model on the main process."""
-        if self.model_process_complete:
-            msg = 'STOP'
-        else:
-            msg = 'ERROR'
-        super(MPIPartnerModel, self).stop_mpi_partner(
-            msg, dest=self._mpi_partner_rank,
-            tag=self._mpi_tags['STOP_RANKX'])
+        kwargs.update(dest=self._mpi_partner_rank,
+                      tag=self._mpi_tags['STOP_RANKX'],
+                      msg=self.n_sent_messages)
+        super(MPIPartnerModel, self).stop_mpi_partner(**kwargs)
 
     def run_loop(self):
         r"""Loop to check if model is still running."""
@@ -128,6 +125,20 @@ class MPIPartnerModel(ModelDriver):
         else:
             self.sleep()
 
+    def graceful_stop(self):
+        r"""Gracefully stop the driver."""
+        if self.has_sent_messages:
+            self.wait_on_mpi_request('stopped', timeout=10)
+        self.set_break_flag()
+        super(MPIPartnerModel, self).graceful_stop()
+        
+    def kill_process(self):
+        r"""Kill the process running the model, checking return code."""
+        self.set_break_flag()
+        if not self.model_process_complete:
+            self._mpi_requests['stopped']['result'] = True
+        super(MPIPartnerModel, self).kill_process()
+        
     @property
     def model_process_complete(self):
         r"""bool: Has the process finished or not. Returns True if the process

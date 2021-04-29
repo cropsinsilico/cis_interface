@@ -251,6 +251,7 @@ class ConnectionDriver(Driver):
         self._init_comms(name, **kwargs)
         self.models = {'input': list(self.icomm.model_env.keys()),
                        'output': list(self.ocomm.model_env.keys())}
+        self.models_recvd = {}
         # self.debug('    env: %s', str(self.env))
         self.debug(('\n' + 80 * '=' + '\n'
                     + 'class = %s\n'
@@ -579,8 +580,7 @@ class ConnectionDriver(Driver):
         if not self.is_alive():
             return False
         self.debug("All %s models have signed off.", direction)
-        if (((self.onexit not in [None, 'on_model_exit',
-                                  'pass'])
+        if (((self.onexit not in [None, 'on_model_exit', 'pass'])
              and (not errors))):
             self.debug("Calling onexit = '%s'" % self.onexit)
             getattr(self, self.onexit)()
@@ -790,6 +790,9 @@ class ConnectionDriver(Driver):
                 return False
             msg = self.icomm.recv(return_message_object=True, **kwargs)
             self.errors += self.icomm.errors
+        if msg.header and ('model' in msg.header):
+            self.models_recvd.setdefault(msg.header['model'], 0)
+            self.models_recvd[msg.header['model']] += 1
         if msg.flag == CommBase.FLAG_EOF:
             return self.on_eof(msg)
         if msg.flag == CommBase.FLAG_SUCCESS:

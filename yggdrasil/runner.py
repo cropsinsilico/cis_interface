@@ -9,6 +9,7 @@ import atexit
 from pprint import pformat
 from itertools import chain
 import socket
+from collections import OrderedDict
 from yggdrasil.tools import YggClass
 from yggdrasil.config import ygg_cfg, cfg_environment, temp_config
 from yggdrasil import platform, yamlfile
@@ -320,7 +321,7 @@ class YggRunner(YggClass):
                 timer = time.time
             if t0 is None:
                 t0 = timer()
-            times = {}
+            times = OrderedDict()
             times['init'] = timer()
             self.loadDrivers()
             times['load drivers'] = timer()
@@ -333,12 +334,9 @@ class YggRunner(YggClass):
                 self.atexit()
                 times['at exit'] = timer()
             tprev = t0
-            key_order = ['init', 'load drivers', 'start drivers', 'run models',
-                         'at exit']
-            for k in key_order:
-                if k in times:
-                    self.info('%20s\t%f', k, times[k] - tprev)
-                    tprev = times[k]
+            for k, t in times.items():
+                self.info('%20s\t%f', k, t - tprev)
+                tprev = t
             self.info(40 * '=')
             self.info('%20s\t%f', "Total", tprev - t0)
         return times

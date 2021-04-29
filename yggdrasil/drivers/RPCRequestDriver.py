@@ -65,6 +65,16 @@ class RPCRequestDriver(ConnectionDriver):
         self._block_response = False
 
     @property
+    def servers_recvd(self):
+        r"""list: Names of server models that have returned responses."""
+        out = {}
+        for x in self.response_drivers.values():
+            for k, v in x.models_recvd.items():
+                out.setdefault(k, 0)
+                out[k] += v
+        return out
+
+    @property
     @run_remotely
     def clients(self):
         r"""list: Clients that are connected."""
@@ -129,6 +139,8 @@ class RPCRequestDriver(ConnectionDriver):
             out = super(RPCRequestDriver, self).remove_model(
                 direction, name)
             if out:
+                if self.ocomm.partner_copies > 1:
+                    self.ocomm.partner_copies = len(self.servers_recvd)
                 self.send_eof()
             return out
         

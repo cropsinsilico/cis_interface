@@ -438,7 +438,7 @@ def cfg_logging(cfg=None):
         cfg = ygg_cfg
     log_format = cfg.get(
         'debug', 'format',
-        "%(levelname)s:%(module)s.%(funcName)s[%(lineno)d]:%(message)s")
+        "%(levelname)s:%(process)d:%(module)s.%(funcName)s[%(lineno)d]:%(message)s")
     logLevelYGG = eval(
         'logging.%s' % os.environ.get(
             'YGG_DEBUG', cfg.get('debug', 'ygg', 'NOTSET')))

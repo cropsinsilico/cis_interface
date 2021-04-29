@@ -107,7 +107,6 @@ def register_example(example_dir):
             src_names = ['%sCli%s' % (example_base, ext_map[lang_set[0]]),
                          '%sSrv%s' % (example_base, ext_map[lang_set[1]])]
         elif example_base.startswith('rpc_'):
-            # TODO: Create server examples in other languages
             yml_names = ['server_%s.yml' % lang,
                          'client_%s.yml' % lang]
             src_names = ['server%s' % ext_map[lang],

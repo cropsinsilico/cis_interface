@@ -109,25 +109,25 @@ class MPIComm(CommBase.CommBase):
     r"""Class for handling I/O via MPI communicators.
 
     Args:
+        start_tag (int, optional): Tag that MPI messages should start with.
+            Defaults to 0.
         partner_mpi_ranks (list, optional): Rank of MPI processes that partner
             models are running on. Defaults to None.
 
     Attributes:
-        partner_mpi_ranks (list): Rank of MPI processes that partner models
-            are running on.
+        tag (int): Tag that should be used for the next MPI message.
 
     """
 
     _commtype = 'mpi'
     _schema_subtype_description = 'MPI communicator.'
-    # _schema_properties = {}
     address_description = "The partner communicator ID(s)."
 
-    def __init__(self, *args, start_tag=0, partner_mpi_ranks=[], **kwargs):
+    def __init__(self, *args, start_tag=0, **kwargs):
         assert(_on_mpi)
-        if partner_mpi_ranks:
+        if kwargs.get('partner_mpi_ranks', []):
             assert(kwargs.get('address', 'generate') == 'generate')
-            kwargs['address'] = partner_mpi_ranks
+            kwargs['address'] = kwargs['partner_mpi_ranks']
         self.requests = []
         self.tag = start_tag
         self.requires_disconnect = False
