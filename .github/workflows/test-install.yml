@@ -253,7 +253,7 @@ jobs:
       run: yggtest --ci --cov-append --test-suite=mpi
     - name: Start SSH session
       uses: luchihoratiu/debug-via-ssh@main
-      if: ${{ failure() && matrix.os != 'windows-latest' }}
+      if: ${{ failure() && matrix.os == 'ubuntu-latest' }}
       with:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         SSH_PASS: ${{ secrets.SSH_PASS }}
@@ -533,7 +533,7 @@ jobs:
       run: yggtest --ci --cov-append --test-suite=mpi
     - name: Start SSH session
       uses: luchihoratiu/debug-via-ssh@main
-      if: ${{ failure() && matrix.os != 'windows-latest' }}
+      if: ${{ failure() && matrix.os == 'ubuntu-latest' }}
       with:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         SSH_PASS: ${{ secrets.SSH_PASS }}
@@ -793,7 +793,7 @@ jobs:
       run: yggtest --ci --cov-append --test-suite=mpi
     - name: Start SSH session
       uses: luchihoratiu/debug-via-ssh@main
-      if: ${{ failure() && matrix.os != 'windows-latest' }}
+      if: ${{ failure() && matrix.os == 'ubuntu-latest' }}
       with:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         SSH_PASS: ${{ secrets.SSH_PASS }}
@@ -1055,7 +1055,7 @@ jobs:
       run: yggtest --ci --cov-append --test-suite=mpi
     - name: Start SSH session
       uses: luchihoratiu/debug-via-ssh@main
-      if: ${{ failure() && matrix.os != 'windows-latest' }}
+      if: ${{ failure() && matrix.os == 'ubuntu-latest' }}
       with:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         SSH_PASS: ${{ secrets.SSH_PASS }}
@@ -1315,7 +1315,7 @@ jobs:
       run: yggtest --ci --cov-append --test-suite=mpi
     - name: Start SSH session
       uses: luchihoratiu/debug-via-ssh@main
-      if: ${{ failure() && matrix.os != 'windows-latest' }}
+      if: ${{ failure() && matrix.os == 'ubuntu-latest' }}
       with:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         SSH_PASS: ${{ secrets.SSH_PASS }}
