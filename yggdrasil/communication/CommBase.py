@@ -355,6 +355,8 @@ class CommBase(tools.YggClass):
             interface binding. Defaults to False.
         language (str, optional): Programming language of the calling model.
             Defaults to 'python'.
+        env (dict, optional): Environment variable that should be used.
+            Defaults to os.environ if not provided.
         partner_model (str, optional): Name of model that this comm is
             partnered with. Default to None, indicating that the partner
             is not a model.
@@ -473,6 +475,7 @@ class CommBase(tools.YggClass):
             connection.
         is_interface (bool): True if this comm is a Python interface binding.
         language (str): Language that this comm is being called from.
+        env (dict): Environment variable that should be used.
         partner_model (str): Name of model that this comm is partnered with.
         partner_language (str): Programming language of this comm's partner comm.
         partner_mpi_ranks (list): Ranks of processes of this comm's partner comm(s).
@@ -578,7 +581,7 @@ class CommBase(tools.YggClass):
     _finalize_message_kws = ['skip_python2language', 'after_finalize_message']
 
     def __init__(self, name, address=None, direction='send', dont_open=False,
-                 is_interface=None, language=None, partner_copies=0,
+                 is_interface=None, language=None, env=None, partner_copies=0,
                  partner_model=None, partner_language='python', partner_mpi_ranks=[],
                  recv_timeout=0.0, close_on_eof_recv=True, close_on_eof_send=False,
                  single_use=False, reverse_names=False, no_suffix=False,
@@ -596,27 +599,30 @@ class CommBase(tools.YggClass):
         suffix = determine_suffix(no_suffix=no_suffix,
                                   reverse_names=reverse_names,
                                   direction=direction)
+        if env is None:
+            env = os.environ
+        self.env = env
         self.name_base = name
         self.suffix = suffix
         self._name = name + suffix
         if address is None:
-            if self.name not in os.environ:
+            if self.name not in self.env:
                 model_name = self.model_name
                 prefix = '%s:' % model_name
                 if model_name and (not self.name.startswith(prefix)):
                     self._name = prefix + self.name
-                if (((self.name not in os.environ)
+                if (((self.name not in self.env)
                      and (self.name.replace(':', '__COLON__')
-                          not in os.environ))):
+                          not in self.env))):
                     import pprint
-                    env_str = pprint.pformat(os.environ.copy())
+                    env_str = pprint.pformat(self.env.copy())
                     raise RuntimeError(
                         'Cannot see %s in env (model = %s). Env:\n%s' %
                         (self.name, model_name, env_str))
             try:
-                self.address = os.environ[self.name]
+                self.address = self.env[self.name]
             except KeyError:
-                self.address = os.environ[self.name.replace(':', '__COLON__')]
+                self.address = self.env[self.name.replace(':', '__COLON__')]
         else:
             self.address = address
         self.direction = direction
@@ -667,7 +673,7 @@ class CommBase(tools.YggClass):
         self._send_serializer = True
         self.allow_multiple_comms = allow_multiple_comms
         if (((not self.single_use)
-             and ((self.is_interface and os.environ.get('YGG_THREADING', False))
+             and ((self.is_interface and self.env.get('YGG_THREADING', False))
                   or (self.model_copies > 1) or (self.partner_copies > 1)))):
             self.allow_multiple_comms = True
         if self.single_use and (not self.is_response_server):
@@ -964,20 +970,20 @@ class CommBase(tools.YggClass):
     @property
     def model_name(self):
         r"""str: Name of the model using the comm."""
-        return os.environ.get('YGG_MODEL_NAME', '')
+        return self.env.get('YGG_MODEL_NAME', '')
 
     @property
     def full_model_name(self):
         r"""str: Name of the model using the comm w/ copy suffix."""
         out = self.model_name
-        if out and ('YGG_MODEL_COPY' in os.environ):
-            out += '_copy%s' % os.environ['YGG_MODEL_COPY']
+        if out and ('YGG_MODEL_COPY' in self.env):
+            out += '_copy%s' % self.env['YGG_MODEL_COPY']
         return out
         
     @property
     def model_copies(self):
         r"""int: Number of copies of the model using the comm."""
-        return int(os.environ.get('YGG_MODEL_COPIES', '1'))
+        return int(self.env.get('YGG_MODEL_COPIES', '1'))
 
     @classmethod
     def underlying_comm_class(cls):

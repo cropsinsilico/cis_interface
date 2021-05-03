@@ -63,6 +63,7 @@ class ServerComm(CommBase.CommBase):
         self.response_kwargs.setdefault('recv_timeout', self.icomm.recv_timeout)
         self.response_kwargs.setdefault('language', self.icomm.language)
         self.response_kwargs.setdefault('use_async', self.icomm.is_async)
+        self.response_kwargs.setdefault('env', self.icomm.env)
         self.clients = []
         self.closed_clients = []
         self.nclients_expected = int(os.environ.get('YGG_NCLIENTS', 0))
@@ -71,7 +72,8 @@ class ServerComm(CommBase.CommBase):
                                          is_interface=self.icomm.is_interface,
                                          direction='recv', no_suffix=True,
                                          address=self.icomm.address,
-                                         is_async=self.icomm.is_async)
+                                         is_async=self.icomm.is_async,
+                                         env=self.icomm.env)
 
     def get_status_message(self, nindent=0, **kwargs):
         r"""Return lines composing a status message.
