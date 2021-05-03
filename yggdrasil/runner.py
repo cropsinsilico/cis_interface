@@ -373,7 +373,8 @@ class YggRunner(YggClass):
         try:
             if (yml.get('copies', 1) > 1) and ('copy_index' not in yml):
                 instance = DuplicatedModelDriver(
-                    yml, namespace=self.namespace, rank=self.rank)
+                    yml, namespace=self.namespace, rank=self.rank,
+                    duplicates=yml.pop('duplicates', None))
             else:
                 instance = create_driver(yml=yml, namespace=self.namespace,
                                          rank=self.rank, **yml)
@@ -407,22 +408,38 @@ class YggRunner(YggClass):
             object: An instance of the specified driver.
 
         """
+        # Add MPI ranks
+        if self.mpi_comm and (self.rank == 0):
+            for io in ['inputs', 'outputs']:
+                for x in yml[io]:
+                    model = x.get('partner_model', None)
+                    if not model:
+                        continue
+                    ranks = []
+                    if model in self.modelcopies:
+                        assert(model not in self.modeldrivers)
+                        for cpy in self.modelcopies[model]:
+                            ranks.append(self.modeldrivers[cpy]['mpi_rank'])
+                    else:
+                        ranks.append(self.modeldrivers[model]['mpi_rank'])
+                    x['partner_mpi_ranks'] = set(ranks)
         yml['task_method'] = self.connection_task_method
         drv = self.create_driver(yml)
         # Transfer connection addresses to model via env
         # TODO: Change to server that tracks connections
         for model, env in drv.model_env.items():
-            try:
-                self.modeldrivers[model].setdefault('env', {})
-                self.modeldrivers[model]['env'].update(env)
-            except KeyError:
-                model0 = model.split('_copy')[0]
-                if (((model0 in self.modeldrivers)
-                     and (self.modeldrivers[model0].get('copies', 0) > 1))):
-                    self.modeldrivers[model0].setdefault('env_%s' % model, {})
-                    self.modeldrivers[model0]['env_%s' % model].update(env)
-                else:  # pragma: debug
-                    raise
+            env_key = 'env'
+            if model in self.modelcopies:
+                models = [self.modeldrivers[cpy] for cpy in self.modelcopies[model]]
+            elif model in self.modeldrivers:
+                models = [self.modeldrivers[model]]
+            else:
+                env_key = 'env_%s' % model
+                models = [self.modeldrivers[model.split('_copy')[0]]]
+                assert(models[0].get('copies', 0) > 1)
+            for x in models:
+                x.setdefault(env_key, {})
+                x[env_key].update(env)
         return drv
         
     def loadDrivers(self):
@@ -431,41 +448,44 @@ class YggRunner(YggClass):
         self.debug('')
         driver = dict(name='name')
         try:
+            # Expand duplicated models and sort models between MPI processes
+            if self.mpi_comm and (self.rank == 0):
+                remove_dup = []
+                add_dup = {}
+                base_dup = {}
+                for k, v in self.modeldrivers.items():
+                    if v.get('copies', 1) > 1:
+                        self.modelcopies[v['name']] = []
+                        for x in DuplicatedModelDriver.get_yaml_copies(v):
+                            add_dup[x['name']] = x
+                            self.modelcopies[v['name']].append(x['name'])
+                        remove_dup.append(k)
+                for k in remove_dup:
+                    base_dup[k] = self.modeldrivers.pop(k)
+                self.modeldrivers.update(add_dup)
+                size = self.mpi_comm.Get_size()
+                for i, v in enumerate(self.modeldrivers.values()):
+                    v['mpi_rank'] = (i + 1) % size
+                    v['model_index'] = i
             # Create connection drivers
             self.debug("Loading connection drivers")
             for driver in self.connectiondrivers.values():
                 self.create_connection_driver(driver)
-            # Distribute tasks
+            # Distribute tasks to MPI processes
             if self.mpi_comm:
                 if self.rank == 0:
                     self.all_modeldrivers = self.modeldrivers
-                    # Expand duplicated models
-                    remove_dup = []
-                    add_dup = {}
-                    for k, v in self.modeldrivers.items():
-                        if v.get('copies', 1) > 1:
-                            self.modelcopies[v['name']] = []
-                            for x in DuplicatedModelDriver.get_yaml_copies(v):
-                                add_dup[x['name']] = x
-                                self.modelcopies[v['name']].append(x['name'])
-                            remove_dup.append(k)
-                    for k in remove_dup:
-                        self.modeldrivers.pop(k)
-                    self.modeldrivers.update(add_dup)
-                    for i, v in enumerate(self.modeldrivers.values()):
-                        v['model_index'] = i
                     # Sort tasks
                     size = self.mpi_comm.Get_size()
                     models = [[] for _ in range(size)]
                     for i, (k, v) in enumerate(self.modeldrivers.items()):
                         x_cp = copy.deepcopy(v)
-                        for k2 in ['input_drivers', 'output_drivers']:
+                        for k2 in ['input_drivers', 'output_drivers',
+                                   'mpi_rank']:
                             x_cp.pop(k2, None)
                         # Skew models away from root process so that
                         # connection threading might not share process
-                        rank = (i + 1) % size
-                        models[rank].append((k, x_cp))
-                        v['mpi_rank'] = rank
+                        models[v['mpi_rank']].append((k, x_cp))
                     max_len = len(max(models, key=len))
                     for x in models:
                         while len(x) < max_len:
@@ -477,6 +497,10 @@ class YggRunner(YggClass):
                      if (x is not None)])
                 self.info("Models on MPI process %d: %s", self.rank,
                           list(self.modeldrivers.keys()))
+                # Add dummy drivers on root process to monitor remote ones
+                # and re-group copies into duplicate model w/ duplicate models
+                # before non-duplicate to allow them to start before starting
+                # local models
                 if self.rank == 0:
                     temp = {}
                     for i, (k, v) in enumerate(self.all_modeldrivers.items()):
@@ -485,13 +509,22 @@ class YggRunner(YggClass):
                             v['language'] = 'mpi'
                             v['driver'] = 'MPIPartnerModel'
                         temp[k] = v
-                    self.modeldrivers = temp
+                    self.modeldrivers = {}
+                    for k, base in base_dup.items():
+                        base['duplicates'] = []
+                        for cpy in self.modelcopies.pop(k):
+                            base['duplicates'].append(temp.pop(cpy))
+                        for x in base['duplicates']:
+                            for k2 in ['input_drivers', 'output_drivers']:
+                                x[k2] = base[k2]
+                        self.modeldrivers[k] = base
+                    self.modeldrivers.update(temp)
             # Create model drivers
             self.debug("Loading model drivers")
             for driver in self.modeldrivers.values():
                 self.createModelDriver(driver)
-        except BaseException:  # pragma: debug
-            self.error("%s could not be created.", driver['name'])
+        except BaseException as e:  # pragma: debug
+            self.error("%s could not be created: %s", driver['name'], e)
             self.terminate()
             raise
 
