@@ -680,7 +680,8 @@ class CommBase(tools.YggClass):
             self._send_serializer = False
         self.create_proxy = ((self.is_client or self.allow_multiple_comms)
                              and (not self.is_interface)
-                             and (self.direction != 'recv'))
+                             and (self.direction != 'recv')
+                             and (self._commtype != 'mpi'))
         # Add interface tag
         if self.is_interface:
             self._name += '_I'
@@ -1072,6 +1073,13 @@ class CommBase(tools.YggClass):
         if self.partner_model is not None:
             out[self.partner_model] = self.opp_comms
         return out
+
+    @property
+    def mpi_model_kws(self):
+        r"""dict: Mapping between model name and opposite comm keyword
+        arguments that need to be provided to the model for the MPI
+        connection."""
+        return {}
 
     @property
     def opp_name(self):

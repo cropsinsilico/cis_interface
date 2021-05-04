@@ -328,6 +328,20 @@ class ConnectionDriver(Driver):
             self.task_thread.connection = self
 
     @property
+    def mpi_inputs(self):
+        r"""dict: Mapping between model name and opposite comm
+        environment variables that need to be provided to the model
+        for input comms connected via MPI."""
+        return self.icomm.mpi_model_kws
+
+    @property
+    def mpi_outputs(self):
+        r"""dict: Mapping between model name and opposite comm
+        environment variables that need to be provided to the model
+        for output comms connected via MPI."""
+        return self.ocomm.mpi_model_kws
+
+    @property
     def model_env(self):
         r"""dict: Mapping between model name and opposite comm
         environment variables that need to be provided to the model."""

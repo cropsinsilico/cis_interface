@@ -130,7 +130,8 @@ def new_comm(name, commtype=None, use_async=False, **kwargs):
         if len(commtype) == 1:
             kwargs.update(commtype[0])
             kwargs.setdefault('name', name)
-            return new_comm(use_async=use_async, **kwargs)
+            kwargs.setdefault('use_async', use_async)
+            return new_comm(**kwargs)
         else:
             kwargs['comm_list'] = commtype
             commtype = 'fork'

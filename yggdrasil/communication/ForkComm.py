@@ -181,6 +181,19 @@ class ForkComm(CommBase.CommBase):
         return out
 
     @property
+    def mpi_model_kws(self):
+        r"""dict: Mapping between model name and opposite comm keyword
+        arguments that need to be provided to the model for the MPI
+        connection."""
+        out = {}
+        for x in self.comm_list:
+            iout = x.mpi_model_kws
+            for k, v in iout.items():
+                out.setdefault(k, [])
+                out[k] += v
+        return out
+
+    @property
     def opp_comms(self):
         r"""dict: Name/address pairs for opposite comms."""
         out = super(ForkComm, self).opp_comms

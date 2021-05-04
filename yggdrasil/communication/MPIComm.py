@@ -109,13 +109,18 @@ class MPIComm(CommBase.CommBase):
     r"""Class for handling I/O via MPI communicators.
 
     Args:
-        start_tag (int, optional): Tag that MPI messages should start with.
+        tag_start (int, optional): Tag that MPI messages should start with.
             Defaults to 0.
+        tag_stride (int, optional): Amount that tag should be advanced after
+            each message to avoid conflicts w/ other MPIComm communicators.
+            Defaults to 1.
         partner_mpi_ranks (list, optional): Rank of MPI processes that partner
             models are running on. Defaults to None.
 
     Attributes:
         tag (int): Tag that should be used for the next MPI message.
+        tag_stride (int): Amount that tag should be advanced after each
+            each message to avoid conflicts w/ other MPIComm communicators.
 
     """
 
@@ -123,16 +128,20 @@ class MPIComm(CommBase.CommBase):
     _schema_subtype_description = 'MPI communicator.'
     address_description = "The partner communicator ID(s)."
 
-    def __init__(self, *args, start_tag=0, **kwargs):
+    def __init__(self, *args, tag_start=0, tag_stride=1, **kwargs):
         assert(_on_mpi)
         if kwargs.get('partner_mpi_ranks', []):
             assert(kwargs.get('address', 'generate') == 'generate')
             kwargs['address'] = kwargs['partner_mpi_ranks']
         self.requests = []
-        self.tag = start_tag
+        self.tag = tag_start
+        self.tag_start = tag_start
+        self.tag_stride = tag_stride
         self.requires_disconnect = False
         self.last_request = None
-        self.mpi_comm = None
+        self.mpi_comm = MPI.COMM_WORLD
+        self._is_open = False
+        kwargs['no_suffix'] = True
         super(MPIComm, self).__init__(*args, **kwargs)
 
     @classmethod
@@ -145,20 +154,65 @@ class MPIComm(CommBase.CommBase):
     def bind(self):
         r"""Bind to random queue if address is generate."""
         if isinstance(self.address, str):
-            self.address = [int(self.address)]
+            self.address = tuple([int(x) for x in self.address.split(',')])
         super(MPIComm, self).bind()
 
+    @property
+    def model_env(self):
+        r"""dict: Mapping between model name and opposite comm
+        environment variables that need to be provided to the model."""
+        return {}
+    
+    @property
+    def mpi_model_kws(self):
+        r"""dict: Mapping between model name and opposite comm keyword
+        arguments that need to be provided to the model for the MPI
+        connection."""
+        out = {}
+        if self.partner_model is not None:
+            out[self.partner_model] = [
+                {'name': '%s_mpi_%s' % (self.name, self.direction),
+                 'driver': 'ConnectionDriver'}]
+            opp = self.opp_comm_kwargs()
+            opp['env'] = self.opp_comms
+            if opp['direction'] == 'recv':
+                out[self.partner_model][0]['inputs'] = [opp]
+                out[self.partner_model][0]['outputs'] = [
+                    {'name': self.name,
+                     'partner_model': self.partner_model,
+                     'partner_language': self.partner_language}]
+            else:
+                out[self.partner_model][0]['outputs'] = [opp]
+                out[self.partner_model][0]['inputs'] = [
+                    {'name': self.name,
+                     'partner_model': self.partner_model,
+                     'partner_language': self.partner_language}]
+        return out
+        
     @property
     def opp_address(self):
         r"""str: Address for opposite comm."""
         return str(self.mpi_comm.Get_rank())
+        
+    def opp_comm_kwargs(self):
+        r"""Get keyword arguments to initialize communication with opposite
+        comm object.
+
+        Returns:
+            dict: Keyword arguments for opposite comm object.
+
+        """
+        out = super(MPIComm, self).opp_comm_kwargs()
+        out['tag_start'] = self.tag_start
+        out['tag_stride'] = self.tag_stride
+        return out
         
     def open(self):
         r"""Open the queue."""
         # TODO: Handle group
         super(MPIComm, self).open()
         if not self.is_open:
-            self.mpi_comm = MPI.COMM_WORLD
+            self._is_open = True
             assert(self.mpi_comm.Get_rank() not in self.address)
             
     def _close(self, linger=False):
@@ -166,7 +220,7 @@ class MPIComm(CommBase.CommBase):
         for x in self.requests:
             if not x.complete:
                 x.cancel()
-                self.tag -= 1
+                self.tag -= self.tag_stride
         if self.requires_disconnect and self.is_open:
             self.mpi_comm.Disconnect()
         self.mpi_comm = None
@@ -175,7 +229,7 @@ class MPIComm(CommBase.CommBase):
     @property
     def is_open(self):
         r"""bool: True if the queue is not None."""
-        return (self.mpi_comm is not None)
+        return (self.mpi_comm is not None) and self._is_open
         
     def confirm_send(self, noblock=False):
         r"""Confirm that sent message was received."""
@@ -217,7 +271,7 @@ class MPIComm(CommBase.CommBase):
                 kwargs['previous_requests'] = self.last_request.remainder
             cls = MPIMultiRequest
         self.requests.append(cls(*args, **kwargs))
-        self.tag += 1
+        self.tag += self.tag_stride
 
     def _send(self, payload):
         r"""Send a message.
