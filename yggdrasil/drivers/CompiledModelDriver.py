@@ -382,7 +382,8 @@ class CompilationToolBase(object):
             setattr(cls, k, copy.deepcopy(getattr(cls, k, [])))
         # Set attributes based on environment variables
         if cls.env_matches_tool():
-            cls.default_executable = os.environ[cls.default_executable_env]
+            cls.default_executable = os.environ[cls.default_executable_env].split(
+                'ccache ')[-1]
         # Set default_executable to name
         if cls.default_executable is None:
             cls.default_executable = cls.toolname
@@ -670,7 +671,7 @@ class CompilationToolBase(object):
             tool_base.append(cls.default_executable)
         if isinstance(cls.default_executable_env, str):
             envi_base = os.path.basename(
-                os.environ.get(cls.default_executable_env, ''))
+                os.environ.get(cls.default_executable_env, '').split('ccache ')[-1])
         if os.environ.get('PATHEXT', ''):
             tool_base = [x.split(os.environ['PATHEXT'])[0]
                          for x in tool_base]
@@ -916,7 +917,7 @@ class CompilationToolBase(object):
 
     @classmethod
     def get_executable_command(cls, args, skip_flags=False, unused_kwargs=None,
-                               **kwargs):
+                               use_ccache=False, **kwargs):
         r"""Determine the command required to run the tool using the specified
         arguments and options.
 
@@ -931,6 +932,8 @@ class CompilationToolBase(object):
             unused_kwargs (dict, optional): Existing Python dictionary that
                 unused keyword arguments will be added to. Defaults to None and
                 is initialized to an empty dict.
+            use_ccache (bool, optional): If True, ccache will be added to
+                the compilation executable. Defaults to False.
             **kwargs: Additional keyword arguments are ignored and stored in
                 unused_kwargs if provided.
 
@@ -954,6 +957,8 @@ class CompilationToolBase(object):
         cmd = flags + args + library_flags
         if (len(cmd) == 0) or (not os.path.splitext(cmd[0])[0].endswith(cls.toolname)):
             cmd = [cls.get_executable()] + cmd
+        if use_ccache and shutil.which('ccache'):
+            cmd = ['ccache'] + cmd
         # Pop library flags so it is not an unused_kwarg in cases of non-linking
         # compiler command
         for k in ['library_flags', 'skip_library_libs']:

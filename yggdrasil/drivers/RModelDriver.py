@@ -309,8 +309,9 @@ class RModelDriver(InterpretedModelDriver):  # pragma: R
     # The following is only provided for the yggcc CLI for building R
     # packages and should not be used directly
     @classmethod
-    def call_compile(cls, package_dir, toolname=None, flags=None,
-                     language='c++', verbose=False):  # pragma: no cover
+    def call_compiler(cls, package_dir, toolname=None, flags=None,
+                      language='c++', verbose=False,
+                      use_ccache=False):  # pragma: no cover
         r"""Build an R package w/ the yggdrasil compilers.
 
         Args:
@@ -323,6 +324,8 @@ class RModelDriver(InterpretedModelDriver):  # pragma: R
                 (e.g. c, fortran). Defautls to 'c++'.
             verbose (bool, optional): If True, information about the build
                 process will be displayed. Defaults to False.
+            use_ccache (bool, optional): If True, ccache will be added to
+                the compilation executable. Defaults to False.
 
         """
         import shutil
@@ -335,12 +338,16 @@ class RModelDriver(InterpretedModelDriver):  # pragma: R
             package_dir = package_dir[0]
         cexec_vars = {'c': ['CC', 'CC_FOR_BUILD'],
                       'c++': ['CXX', 'CPP', 'CXX98', 'CXX11', 'CXX14',
-                              'CXX17', 'CXX_FOR_BUILD'],
+                              'CXX17', 'CXX20', 'CXX_FOR_BUILD'],
                       'fortran': ['FC', 'F77']}
         cflag_vars = {'c': ['CFLAGS'],
                       'c++': ['CXXFLAGS', 'CXX98FLAGS', 'CXX11FLAGS',
-                              'CXX14FLAGS', 'CXX17FLAGS'],
+                              'CXX14FLAGS', 'CXX17FLAGS', 'CXX20FLAGS'],
                       'fortran': ['FFFLAGS', 'FCFLAGS']}
+        cstd_vars = {'c': [],
+                     'c++': ['CXXSTD', 'CXX11STD', 'CXX14STD',
+                             'CXX17STD', 'CXX20STD'],
+                     'fortran': []}
         env = os.environ.copy()
         new_env = {}
         for x in constants.LANGUAGES['compiled']:
@@ -350,16 +357,25 @@ class RModelDriver(InterpretedModelDriver):  # pragma: R
             # archiver = compiler.archiver()
             env = drv.set_env_compiler(existing=env, compiler=compiler)
             cexec = compiler.get_executable(full_path=True)
+            if use_ccache and shutil.which('ccache'):
+                cexec = '%s %s' % ('ccache', cexec)
+                env['CCACHE_NOHASHDIR'] = 'true'
             kws = {}
             if x == 'c++':
                 kws['skip_standard_flag'] = True
-            cflags = drv.get_compiler_flags(for_model=True, toolname=toolname,
-                                            dry_run=True, compiler=compiler,
-                                            dont_link=True, **kws)
+            cflags0 = drv.get_compiler_flags(for_model=True, toolname=toolname,
+                                             dry_run=True, compiler=compiler,
+                                             dont_link=True, **kws)
             lflags = drv.get_linker_flags(for_model=True, toolname=toolname,
                                           dry_run=True, libtype='shared')
             # Remove flags that are unnecessary
-            cflags = [x for x in cflags if not x.startswith("-std=")]
+            cflags = []
+            stdflags = []
+            for k in cflags0:
+                if k.startswith("-std="):
+                    stdflags.append(k)
+                else:
+                    cflags.append(k)
             for k in ['-c']:
                 if k in cflags:
                     cflags.remove(k)
@@ -372,6 +388,9 @@ class RModelDriver(InterpretedModelDriver):  # pragma: R
             for k in cflag_vars[x]:
                 env[k] = ''
                 new_env[k] = ' '.join(cflags)
+            for k in cstd_vars[x]:
+                env[k] = ''
+                new_env[k] = ' '.join(stdflags)
             if language == x:
                 env['LDFLAGS'] = ''
                 new_env['LDFLAGS'] = ' '.join(lflags)

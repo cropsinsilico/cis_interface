@@ -722,6 +722,8 @@ class yggcc(SubCommand):
          {'nargs': '*',
           'help': ("Additional flags that should be added to the compilation "
                    "command")}),
+        (('--use-ccache', ),
+         {'action': 'store_true', 'help': "Run compilation with ccache."}),
         (('--Rpkg-language', ),
          {'help': ("Language that R package is written in "
                    "(only used if the specified language is R).")})]
@@ -737,10 +739,11 @@ class yggcc(SubCommand):
             else:
                 args.language = EXT2LANG[os.path.splitext(args.source[0])[-1]]
         drv = import_component('model', args.language)
-        kws = {'toolname': args.toolname, 'flags': args.flags}
-        if args.language in ['r', 'R']:
+        kws = {'toolname': args.toolname, 'flags': args.flags,
+               'use_ccache': args.use_ccache}
+        if (args.language in ['r', 'R']) and args.Rpkg_language:
             kws['language'] = args.Rpkg_language
-        print("executable: %s" % drv.call_compile(args.source, **kws))
+        print("executable: %s" % drv.call_compiler(args.source, **kws))
 
 
 class yggcompile(SubCommand):
